@@ -1,6 +1,6 @@
 // localStorage への保存と読み込み。読み書きはすべて try/catch で囲み、失敗しても例外を外に出さない。
 // kidori の store/storage.ts を参考に作り直したもの（以前の版からの移し替え・材料・フラッシュなどは無い）。
-// キーはすべて「kidori-simple.」で始める（kidori と同じ github.io のドメインで localStorage を分け合うため。kidori は「kidori.」）
+// キーはすべて「kidori-simple.」で始める（kidori・キドリライトと同じ github.io のドメインで localStorage を分け合うため。kidori は「kidori.」、キドリライトは「kidori-lite.」で、どちらにも触らない）
 import { defaultAppData } from '../engine/defaults'
 import { clipHasFormula, NO_NUMBERING, numberizeJobs, type NumberingReport } from '../engine/migrate/numbers'
 import { isRecord, readCellClip, readJobs, readLegacyAdjusts } from '../engine/shape'
@@ -64,7 +64,7 @@ export function browserStorage(): KeyValueStorage | null {
  * 保存データを読む（第2.2版）。読めれば中身と、前の版の式を数字に置き換えた結果。読めなければ null。
  * - 仕事（今の部材・履歴の中の部材）の式を、保存データの中の調整寸法の一覧で計算した仕上がり寸法の数字にする（engine/migrate/numbers.ts）
  * - 調整寸法の一覧（adjusts）・調整寸法の表のコピー（adjustClip）は置き換えに使ってから捨てる（仕様書 26.2）
- * - 式の入ったアプリ内のコピー（cellClip）は捨てる（仕様書 26.4）
+ * - 前の版の保存データなら、式の入ったアプリ内のコピー（cellClip）は捨てる（仕様書 26.4）
  */
 export function readAppData(raw: unknown): { data: AppData; numbering: NumberingReport } | null {
   if (!isRecord(raw) || raw.version !== 1) return null
@@ -77,9 +77,12 @@ export function readAppData(raw: unknown): { data: AppData; numbering: Numbering
   // 同じ id の仕事が2つあると開く・消すがおかしくなるので読めないとする
   if (new Set(jobs.map((j) => j.id)).size !== jobs.length) return null
   // コピーしたセル（第1.2版）は、形が違えば捨てる（仕事を読めなくしないため）。
-  // 第1.1版の「コピーした部材」（clipboard）は使わなくなったので、あっても読んで捨てる。式が入っていれば捨てる（第2.2版）
+  // 第1.1版の「コピーした部材」（clipboard）は使わなくなったので、あっても読んで捨てる。
+  // 前の版（調整寸法の一覧 adjusts がある保存データ）のコピーに式が入っていれば捨てる（第2.2版。仕様書 26.4）。
+  // 第2.2版の保存データでは確かめない（名前に空白・記号を使えるので、式と見分けられないため）
   const clip = readCellClip(raw.cellClip)
-  const cellClip = clip && clipHasFormula(clip) ? null : clip
+  const legacy = raw.adjusts !== undefined
+  const cellClip = clip && legacy && clipHasFormula(clip) ? null : clip
   const numbered = numberizeJobs(jobs, adjusts)
   return { data: { version: 1, jobs: numbered.jobs, cellClip }, numbering: numbered.report }
 }

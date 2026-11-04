@@ -5,7 +5,7 @@ import { TRANSFER_APP, TRANSFER_VERSION, type BackupFile } from './envelope'
 
 /**
  * バックアップの中身：全部の仕事（切り出しチェック・仕上がりの完了・履歴も）。コピーしたセルは入れない。
- * 調整寸法は第2.2版（仕様書 26.2）でなくしたので、adjusts はいつも空の並び（前の版のアプリでも読めるよう、形は変えない）
+ * 調整寸法は第2.2版（仕様書 26.2）でなくしたので、adjusts はいつも空の並び（ファイルの形は変えない。app が kidori-simple なので、キドリライトでは開けない）
  */
 export function backupFile(data: Pick<AppData, 'jobs'>): BackupFile {
   return { app: TRANSFER_APP, kind: 'backup', version: TRANSFER_VERSION, jobs: data.jobs, adjusts: [] }

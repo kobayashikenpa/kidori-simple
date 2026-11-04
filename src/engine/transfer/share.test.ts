@@ -21,7 +21,7 @@ describe('jobFile・buildJobFile', () => {
     expect(text).not.toMatch(/\n/)
   })
 
-  it('調整寸法は空の並び（第2.2版。式が無いので入れるものが無い。前の版のアプリでも読める形）', () => {
+  it('調整寸法は空の並び（第2.2版。式が無いので入れるものが無い。ファイルの形は変えない）', () => {
     expect(jobFile(shelfJob()).adjusts).toEqual([])
   })
 

@@ -5,7 +5,7 @@ import { TRANSFER_APP, TRANSFER_VERSION, type JobFile } from './envelope'
 
 /**
  * 送る中身：切り出しチェック（固定した1枚）・仕上がりの完了・履歴（第2.1版。仕様書 25.1）を外した仕事。元の仕事は変えない。
- * 調整寸法は第2.2版（仕様書 26.2）でなくしたので、adjusts はいつも空の並び（前の版のアプリでも読めるよう、形は変えない）
+ * 調整寸法は第2.2版（仕様書 26.2）でなくしたので、adjusts はいつも空の並び（ファイルの形は変えない。app が kidori-simple なので、キドリライトでは開けない）
  */
 export function jobFile(job: Job): JobFile {
   return {

@@ -230,6 +230,22 @@ describe('保存と読み込み', () => {
     expect([...st.map.keys()].filter((k) => !k.startsWith('kidori-simple.'))).toEqual(['kidori.jobs.v3'])
   })
 
+  it('キドリライト（kidori-lite.）のキーは読まず、書き換えず、新しく作らない', () => {
+    const st = new MemoryStorage()
+    const lite = {
+      'kidori-lite.data.v1': JSON.stringify({ version: 1, jobs: [legacyShelfJob()], adjusts: shelfAdjusts(), cellClip: null }),
+      'kidori-lite.currentJobId': 'job-shelf',
+      'kidori-lite.ui': '{"partsTab":"cut"}',
+    }
+    for (const [k, v] of Object.entries(lite)) st.setItem(k, v)
+    const r = loadSaved(st, NOW)
+    expect(r.data.jobs).toEqual([])
+    expect(r.currentJobId).toBeNull()
+    saveSaved(st, sample(), 'job-shelf')
+    for (const [k, v] of Object.entries(lite)) expect(st.getItem(k)).toBe(v)
+    expect([...st.map.keys()].filter((k) => k.startsWith('kidori-lite.')).sort()).toEqual(Object.keys(lite).sort())
+  })
+
   it('書けなくても例外を出さず理由を返す', () => {
     const st = new MemoryStorage()
     st.failWrite = true
@@ -369,13 +385,21 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     expect(loadSaved(st, NOW).data.jobs[0].parts[3].expr.W).toBe('378')
   })
 
-  it('式の入ったアプリ内のコピー（セル）は捨てる。数字・名前だけのコピーは残す', () => {
+  it('前の版の保存データの、式の入ったアプリ内のコピー（セル）は捨てる。数字・名前だけのコピーは残す', () => {
     const st = new MemoryStorage()
-    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), cellClip: { rows: 1, cols: 2, cells: [['棚板', '天板.W - 20']] } }))
+    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), adjusts: [], cellClip: { rows: 1, cols: 2, cells: [['棚板', '天板.W - 20']] } }))
     expect(loadSaved(st, NOW).data.cellClip).toBeNull()
     const keep = { rows: 1, cols: 2, cells: [['棚板', '379']] }
-    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), cellClip: keep }))
+    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), adjusts: [], cellClip: keep }))
     expect(loadSaved(st, NOW).data.cellClip).toEqual(keep)
+  })
+
+  it('第2.2版の保存データのコピーは、名前に空白・記号があっても捨てない', () => {
+    const st = new MemoryStorage()
+    const clip = { rows: 3, cols: 2, cells: [['棚板 上', '379'], ['W-1', '400'], ['棚板(上)', '3']] }
+    saveSaved(st, { ...sample(), cellClip: clip }, 'job-shelf')
+    expect(loadSaved(st, NOW).data.cellClip).toEqual(clip)
+    expect(loadSaved(st, NOW).data.cellClip).toEqual(clip)
   })
 
   it('式が無い保存データは置き換えず、控えも作らず、書き直さない', () => {

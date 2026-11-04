@@ -1,6 +1,6 @@
 // W・H の寸法の文字（第2.2版。仕様書 26.1：W・H は数字だけ）
 import { describe, expect, it } from 'vitest'
-import { isSizeInput, isSizeText, pastedSize, readSize, sizeText } from './size'
+import { isSizeInput, pastedSize, readSize, sizeText } from './size'
 
 describe('readSize（保存した W・H の文字 → 寸法）', () => {
   it('数字はその数（小数も）', () => {
@@ -34,13 +34,6 @@ describe('readSize（保存した W・H の文字 → 寸法）', () => {
   it('全角の数字・前後の空白はそろえて読む', () => {
     expect(readSize('４００')).toEqual({ ok: true, value: 400 })
     expect(readSize(' 400 ')).toEqual({ ok: true, value: 400 })
-  })
-})
-
-describe('isSizeText（保存の形：空か半角の数字）', () => {
-  it('空・数字・小数は true、式・全角・空白入り・「12.」は false', () => {
-    for (const t of ['', '400', '379.5', '0']) expect(isSizeText(t)).toBe(true)
-    for (const t of ['天板.W', '1800 - 40', '４００', ' 400', '12.', '=400', '{n:a}']) expect(isSizeText(t)).toBe(false)
   })
 })
 

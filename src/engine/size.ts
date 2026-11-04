@@ -40,10 +40,6 @@ export function readSize(text: string): SizeRead {
   return { ok: false, kind: 'syntax', message: `「${text.trim()}」は使えません（W・H は数字だけです）` }
 }
 
-/** 保存の形（空か、半角の数字）か。全角・空白・「12.」・式は false */
-export function isSizeText(text: string): boolean {
-  return text === '' || SIZE_RE.test(text)
-}
 
 /** キーで入れている途中も含めて、数字だけの形か（数字と小数点1つまで。空・「12.」・「.」も true） */
 export function isSizeInput(text: string): boolean {

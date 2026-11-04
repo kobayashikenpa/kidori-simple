@@ -14,7 +14,7 @@ describe('backupFile・buildBackupFile', () => {
     expect(text).not.toMatch(/\n/)
   })
 
-  it('全部の仕事（切り出しチェック・仕上がりの完了も）をそのまま。調整寸法は空の並び（第2.2版。前の版のアプリでも読める形）', () => {
+  it('全部の仕事（切り出しチェック・仕上がりの完了も）をそのまま。調整寸法は空の並び（第2.2版。ファイルの形は変えない）', () => {
     const used = freezeAt(shelfJob('job-a', '棚A'), 0, { partId: 'part-gawaita', n: 1 })
     used.parts[1] = { ...used.parts[1], finishedDone: true }
     const f = backupFile({ jobs: [used, shelfJob('job-b', '棚B')] })
