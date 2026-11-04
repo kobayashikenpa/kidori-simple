@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "kidori-lite-dev",
+      "name": "kidori-simple-dev",
       "runtimeExecutable": "/bin/zsh",
       "runtimeArgs": ["-c", "export PATH=\"$HOME/.local/bin:$PATH\" && npm run dev -- --port 5174 --strictPort"],
       "port": 5174

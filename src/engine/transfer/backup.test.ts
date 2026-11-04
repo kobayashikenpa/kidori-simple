@@ -6,11 +6,11 @@ import { shelfAdjusts, shelfJob } from '../fixtures/shelf'
 import { backupFile, backupFileName, buildBackupFile } from './backup'
 
 describe('backupFile・buildBackupFile', () => {
-  it('外側は app: kidori-lite・kind: backup・version 1・jobs・adjusts だけ。空白なしの JSON', () => {
+  it('外側は app: kidori-simple・kind: backup・version 1・jobs・adjusts だけ。空白なしの JSON', () => {
     const text = buildBackupFile({ jobs: [shelfJob()], adjusts: shelfAdjusts() })
     const data = JSON.parse(text)
     expect(Object.keys(data).sort()).toEqual(['adjusts', 'app', 'jobs', 'kind', 'version'])
-    expect([data.app, data.kind, data.version]).toEqual(['kidori-lite', 'backup', 1])
+    expect([data.app, data.kind, data.version]).toEqual(['kidori-simple', 'backup', 1])
     expect(text).not.toMatch(/\n/)
   })
 
@@ -30,13 +30,13 @@ describe('backupFile・buildBackupFile', () => {
   })
 
   it('仕事が無くても作れる', () => {
-    expect(backupFile({ jobs: [], adjusts: [] })).toEqual({ app: 'kidori-lite', kind: 'backup', version: 1, jobs: [], adjusts: [] })
+    expect(backupFile({ jobs: [], adjusts: [] })).toEqual({ app: 'kidori-simple', kind: 'backup', version: 1, jobs: [], adjusts: [] })
   })
 })
 
 describe('backupFileName', () => {
-  it('kidori-lite-バックアップ-YYYY-MM-DD.json（端末の日付。月・日は2桁）', () => {
-    expect(backupFileName(new Date(2026, 9, 22, 23, 59))).toBe('kidori-lite-バックアップ-2026-10-22.json')
-    expect(backupFileName(new Date(2027, 0, 5, 0, 0))).toBe('kidori-lite-バックアップ-2027-01-05.json')
+  it('kidori-simple-バックアップ-YYYY-MM-DD.json（端末の日付。月・日は2桁）', () => {
+    expect(backupFileName(new Date(2026, 9, 22, 23, 59))).toBe('kidori-simple-バックアップ-2026-10-22.json')
+    expect(backupFileName(new Date(2027, 0, 5, 0, 0))).toBe('kidori-simple-バックアップ-2027-01-05.json')
   })
 })

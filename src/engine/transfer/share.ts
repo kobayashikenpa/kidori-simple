@@ -38,10 +38,10 @@ const BAD_CHARS = /[\\/:*?"<>|\u0000-\u001f\u007f\s]/gu
 const MAX_NAME_LENGTH = 50
 
 /**
- * 仕事1つのファイル名：`<仕事の名前>.kidori-lite.json`（例：本棚.kidori-lite.json）。
- * 前後の空白を外し、使えない文字・空白は「_」に置き換え、50 文字まで。空なら「仕事.kidori-lite.json」
+ * 仕事1つのファイル名：`<仕事の名前>.kidori-simple.json`（例：本棚.kidori-simple.json）。
+ * 前後の空白を外し、使えない文字・空白は「_」に置き換え、50 文字まで。空なら「仕事.kidori-simple.json」
  */
 export function jobFileName(job: Pick<Job, 'name'>): string {
   const base = Array.from(job.name.trim().replace(BAD_CHARS, '_')).slice(0, MAX_NAME_LENGTH).join('')
-  return `${base || '仕事'}.kidori-lite.json`
+  return `${base || '仕事'}.kidori-simple.json`
 }

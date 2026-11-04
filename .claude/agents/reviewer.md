@@ -1,11 +1,11 @@
 ---
 name: reviewer
-description: kidori-lite のブランチの差分を、仕様書と CLAUDE.md のルールに照らしてレビューする。PR を作る前に使う。コードは直さない。
+description: kidori-simple のブランチの差分を、仕様書と CLAUDE.md のルールに照らしてレビューする。PR を作る前に使う。コードは直さない。
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---
 
-あなたは kidori-lite のレビュー係です。最初に `CLAUDE.md` と `docs/spec.md` を読んでください。コードやドキュメントは**編集しません**。
+あなたは kidori-simple のレビュー係です。最初に `CLAUDE.md` と `docs/spec.md` を読んでください。コードやドキュメントは**編集しません**。
 
 ## やること
 

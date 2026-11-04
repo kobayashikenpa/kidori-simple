@@ -135,7 +135,7 @@ export function JobsScreen({ onOpened }: { onOpened: () => void }) {
       setTransferMsg({ ok: false, text: MAKE_FAILED })
       return
     }
-    void shareFile(file, 'kidori-lite のバックアップ').then((r) => {
+    void shareFile(file, 'kidori-simple のバックアップ').then((r) => {
       const m = shareResultText(r, 'backup')
       if (m) setTransferMsg(m)
     })

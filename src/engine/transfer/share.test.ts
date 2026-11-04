@@ -13,11 +13,11 @@ function usedShelf() {
 }
 
 describe('jobFile・buildJobFile', () => {
-  it('外側は app: kidori-lite・kind: job・version 1・job・adjusts だけ。空白なしの JSON', () => {
+  it('外側は app: kidori-simple・kind: job・version 1・job・adjusts だけ。空白なしの JSON', () => {
     const text = buildJobFile(shelfJob(), shelfAdjusts())
     const data = JSON.parse(text)
     expect(Object.keys(data).sort()).toEqual(['adjusts', 'app', 'job', 'kind', 'version'])
-    expect([data.app, data.kind, data.version]).toEqual(['kidori-lite', 'job', 1])
+    expect([data.app, data.kind, data.version]).toEqual(['kidori-simple', 'job', 1])
     expect(text).not.toMatch(/\n/)
   })
 
@@ -74,22 +74,22 @@ describe('jobFile・buildJobFile', () => {
 })
 
 describe('jobFileName', () => {
-  it('「本棚.kidori-lite.json」', () => {
-    expect(jobFileName({ name: '本棚' })).toBe('本棚.kidori-lite.json')
+  it('「本棚.kidori-simple.json」', () => {
+    expect(jobFileName({ name: '本棚' })).toBe('本棚.kidori-simple.json')
   })
 
   it('ファイル名に使えない文字（\\ / : * ? " < > |）・空白・制御文字は「_」に置き換える', () => {
-    expect(jobFileName({ name: '本棚 A/B:C*?"<>|\\' })).toBe('本棚_A_B_C_______.kidori-lite.json')
-    expect(jobFileName({ name: '本棚　2\t' })).toBe('本棚_2.kidori-lite.json')
+    expect(jobFileName({ name: '本棚 A/B:C*?"<>|\\' })).toBe('本棚_A_B_C_______.kidori-simple.json')
+    expect(jobFileName({ name: '本棚　2\t' })).toBe('本棚_2.kidori-simple.json')
   })
 
-  it('前後の空白は外す。空なら「仕事.kidori-lite.json」', () => {
-    expect(jobFileName({ name: '  本棚  ' })).toBe('本棚.kidori-lite.json')
-    expect(jobFileName({ name: '   ' })).toBe('仕事.kidori-lite.json')
-    expect(jobFileName({ name: '' })).toBe('仕事.kidori-lite.json')
+  it('前後の空白は外す。空なら「仕事.kidori-simple.json」', () => {
+    expect(jobFileName({ name: '  本棚  ' })).toBe('本棚.kidori-simple.json')
+    expect(jobFileName({ name: '   ' })).toBe('仕事.kidori-simple.json')
+    expect(jobFileName({ name: '' })).toBe('仕事.kidori-simple.json')
   })
 
   it('名前の部分は 50 文字まで', () => {
-    expect(jobFileName({ name: 'あ'.repeat(60) })).toBe(`${'あ'.repeat(50)}.kidori-lite.json`)
+    expect(jobFileName({ name: 'あ'.repeat(60) })).toBe(`${'あ'.repeat(50)}.kidori-simple.json`)
   })
 })

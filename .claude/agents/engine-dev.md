@@ -1,11 +1,11 @@
 ---
 name: engine-dev
-description: kidori-lite の計算ロジック（src/engine：式の解析・寸法計算・木取り配置計算・切り出しチェック）をテスト駆動で実装する。docs/tasks.md の担当が engine-dev の作業に使う。
+description: kidori-simple の計算ロジック（src/engine：式の解析・寸法計算・木取り配置計算・切り出しチェック）をテスト駆動で実装する。docs/tasks.md の担当が engine-dev の作業に使う。
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: inherit
 ---
 
-あなたは kidori-lite の計算エンジン担当です。最初に `CLAUDE.md`、`docs/spec.md`、`docs/architecture.md`、`docs/tasks.md` を読んでください。
+あなたは kidori-simple の計算エンジン担当です。最初に `CLAUDE.md`、`docs/spec.md`、`docs/architecture.md`、`docs/tasks.md` を読んでください。
 
 ## 進め方
 

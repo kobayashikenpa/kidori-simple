@@ -1,19 +1,19 @@
 // localStorage への保存と読み込み。読み書きはすべて try/catch で囲み、失敗しても例外を外に出さない。
 // kidori の store/storage.ts を参考に作り直したもの（以前の版からの移し替え・材料・フラッシュなどは無い）。
-// キーはすべて「kidori-lite.」で始める（kidori と同じ github.io のドメインで localStorage を分け合うため。kidori は「kidori.」）
+// キーはすべて「kidori-simple.」で始める（kidori と同じ github.io のドメインで localStorage を分け合うため。kidori は「kidori.」）
 import { defaultAppData } from '../engine/defaults'
 import { isRecord, readAdjustClip, readAdjustRows, readCellClip, readJobs } from '../engine/shape'
 import type { AppData } from '../engine/types'
 
 /** 保存データ（AppData）のキー */
-export const DATA_KEY = 'kidori-lite.data.v1'
+export const DATA_KEY = 'kidori-simple.data.v1'
 /** 開いている仕事の id のキー */
-export const CURRENT_JOB_KEY = 'kidori-lite.currentJobId'
+export const CURRENT_JOB_KEY = 'kidori-simple.currentJobId'
 /**
- * 読めなかった保存データの控えのキーの頭。実際のキーは「頭.日時」（例：kidori-lite.data.v1.broken.2026-10-21T10:00:00.000Z）。
+ * 読めなかった保存データの控えのキーの頭。実際のキーは「頭.日時」（例：kidori-simple.data.v1.broken.2026-10-21T10:00:00.000Z）。
  * 控えを残せたときだけ、そのあとの保存をしてよいことにする（元のデータを失わないため）
  */
-export const BROKEN_KEY_PREFIX = 'kidori-lite.data.v1.broken'
+export const BROKEN_KEY_PREFIX = 'kidori-simple.data.v1.broken'
 
 export const LOAD_FAILED = '保存データを読めませんでした'
 

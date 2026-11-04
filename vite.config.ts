@@ -2,9 +2,9 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// GitHub Pages（https://kobayashikenpa.github.io/kidori-lite/）で公開するため base を設定
+// GitHub Pages（https://kobayashikenpa.github.io/kidori-simple/）で公開するため base を設定
 export default defineConfig({
-  base: '/kidori-lite/',
+  base: '/kidori-simple/',
   plugins: [react()],
   test: {
     include: ['src/**/*.test.ts'],

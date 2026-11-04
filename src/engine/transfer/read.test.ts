@@ -64,6 +64,15 @@ describe('readTransferFile：読めるファイル', () => {
     expect(r.ok && r.kind === 'backup' && r.file.jobs[0].history).toEqual(job.history)
   })
 
+  it('分ける前のアプリ（キドリライト：app kidori-lite）の送るファイル・バックアップも読める', () => {
+    const job = JSON.parse(buildJobFile(shelfJob(), shelfAdjusts()))
+    const r = readTransferFile(JSON.stringify({ ...job, app: 'kidori-lite' }))
+    expect(r.ok && r.kind === 'job' && r.file.app).toBe('kidori-simple')
+    const backup = JSON.parse(buildBackupFile({ jobs: [shelfJob()], adjusts: shelfAdjusts() }))
+    const b = readTransferFile(JSON.stringify({ ...backup, app: 'kidori-lite' }))
+    expect(b.ok && b.kind === 'backup' && b.file.jobs.length).toBe(1)
+  })
+
   it('先頭に BOM があっても読める', () => {
     expect(readTransferFile(`﻿${buildJobFile(shelfJob(), shelfAdjusts())}`).ok).toBe(true)
   })
@@ -84,7 +93,7 @@ describe('readTransferFile：読めないファイルは「読み込めません
     ['途中で切れた', buildJobFile(shelfJob(), shelfAdjusts()).slice(0, 100)],
     ['null', 'null'],
     ['配列', '[]'],
-    ['文字', '"kidori-lite"'],
+    ['文字', '"kidori-simple"'],
     ['写真などほかのファイル', '\u0089PNG\r\n'],
   ])('%s', (_label, text) => {
     expect(readTransferFile(text)).toEqual(failed)

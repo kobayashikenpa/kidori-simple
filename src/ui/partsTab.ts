@@ -1,4 +1,4 @@
-// 部材の画面で選んでいる［仕上がり］［木取り］のタブ（仕様書 5.1）。端末ごとの好みなので localStorage の kidori-lite.ui に置く。
+// 部材の画面で選んでいる［仕上がり］［木取り］のタブ（仕様書 5.1）。端末ごとの好みなので localStorage の kidori-simple.ui に置く。
 // 読めない・書けないときも画面は「仕上がり」で動く（kidori の dimensionTab.ts と同じ考え方）
 import type { KeyValueStorage } from '../store/storage'
 
@@ -10,7 +10,7 @@ export const PARTS_TABS: readonly { value: PartsTab; label: string }[] = [
 ]
 
 /** 端末ごとの画面の状態を置くキー（architecture 4章） */
-export const UI_KEY = 'kidori-lite.ui'
+export const UI_KEY = 'kidori-simple.ui'
 
 function readUi(storage: KeyValueStorage | null): Record<string, unknown> {
   try {

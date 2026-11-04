@@ -121,7 +121,7 @@ describe('仕事1つのファイルを取り込む', () => {
   it('切り出しチェックと仕上がりの完了は入らない（ファイルに入っていても外す）', () => {
     const used = freezeAt(shelfJob(), 0, { partId: 'part-gawaita', n: 1 })
     used.parts[1] = { ...used.parts[1], finishedDone: true }
-    const file: TransferFile = { app: 'kidori-lite', kind: 'job', version: 1, job: used, adjusts: shelfAdjusts() }
+    const file: TransferFile = { app: 'kidori-simple', kind: 'job', version: 1, job: used, adjusts: shelfAdjusts() }
     const got = importTransfer(receiver(), file, ids(), NOW).data.jobs[1]
     expect(got.frozenSheets).toEqual([])
     expect(got.parts.some((p) => p.finishedDone)).toBe(false)

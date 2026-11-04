@@ -25,10 +25,10 @@ const ids = () => {
 const sample = (): AppData => ({ version: 1, jobs: [shelfJob()], adjusts: shelfAdjusts(), cellClip: null, adjustClip: null })
 
 describe('キー', () => {
-  it('すべて kidori-lite. で始まる', () => {
-    for (const k of [DATA_KEY, CURRENT_JOB_KEY, BROKEN_KEY_PREFIX]) expect(k.startsWith('kidori-lite.')).toBe(true)
-    expect(DATA_KEY).toBe('kidori-lite.data.v1')
-    expect(CURRENT_JOB_KEY).toBe('kidori-lite.currentJobId')
+  it('すべて kidori-simple. で始まる', () => {
+    for (const k of [DATA_KEY, CURRENT_JOB_KEY, BROKEN_KEY_PREFIX]) expect(k.startsWith('kidori-simple.')).toBe(true)
+    expect(DATA_KEY).toBe('kidori-simple.data.v1')
+    expect(CURRENT_JOB_KEY).toBe('kidori-simple.currentJobId')
   })
 })
 
@@ -222,7 +222,7 @@ describe('保存と読み込み', () => {
     st.setItem('kidori.jobs.v3', 'kidori のデータ')
     saveSaved(st, sample(), 'job-shelf')
     expect(st.getItem('kidori.jobs.v3')).toBe('kidori のデータ')
-    expect([...st.map.keys()].filter((k) => !k.startsWith('kidori-lite.'))).toEqual(['kidori.jobs.v3'])
+    expect([...st.map.keys()].filter((k) => !k.startsWith('kidori-simple.'))).toEqual(['kidori.jobs.v3'])
   })
 
   it('書けなくても例外を出さず理由を返す', () => {

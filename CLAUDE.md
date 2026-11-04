@@ -1,10 +1,17 @@
-# kidori-lite（木取り計算 簡易版）
+# kidori-simple（木取り計算 簡易版）
 
 材料の登録なしで、現場ですぐパネルソーの木取りを計算するスマホ用 Web アプリ。kidori（`https://github.com/kobayashikenpa/kidori`）の簡易版。スマホ（iPhone / Android）で使い、ホーム画面に追加して使う。
 
 - **仕様の正は `docs/spec.md`**。実装で迷ったら仕様書に従い、仕様書に書いていないことは勝手に決めずに進行役（メインの Claude）に報告する
 - 作業の一覧は `docs/tasks.md`、設計は `docs/architecture.md`
 - 仕様書の「12. 検討中」は、まだ作らないもの。オーナーが決めるまで実装しない
+
+## キドリライト（kidori-lite）との関係
+
+- kidori-simple は、キドリライト（`kobayashikenpa/kidori-lite`）の第2.1版から分けて作る **別のアプリ**（2026-11-04 オーナーの判断）。キドリライトは分ける前の形のまま残す
+- **キドリライトのリポジトリは変更しない**。読むだけ
+- 同じ `kobayashikenpa.github.io` の上で動くので、保存（localStorage）のキーは必ず `kidori-simple.` で始める（キドリライトの `kidori-lite.` のデータに触らない）
+- キドリライトの送るファイル・バックアップ（app: `kidori-lite`）は取り込める。書き出すファイルは app: `kidori-simple`
 
 ## kidori との関係
 
@@ -20,7 +27,7 @@
 ## 技術
 
 - React + TypeScript（strict）+ Vite、テストは Vitest、リントは oxlint
-- 公開先は GitHub Pages（`https://kobayashikenpa.github.io/kidori-lite/`）。`vite.config.ts` の `base` は `/kidori-lite/`
+- 公開先は GitHub Pages（`https://kobayashikenpa.github.io/kidori-simple/`）。`vite.config.ts` の `base` は `/kidori-simple/`
 - Node.js / npm / gh は `~/.local/bin` にある。PATH に無ければ `export PATH="$HOME/.local/bin:$PATH"` を先に実行する
 
 ## コマンド

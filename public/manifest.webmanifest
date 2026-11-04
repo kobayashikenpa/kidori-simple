@@ -1,6 +1,6 @@
 {
-  "name": "Kidori Lite",
-  "short_name": "Kidori Lite",
+  "name": "Kidori Simple",
+  "short_name": "Kidori Simple",
   "description": "材料の登録なしで、現場ですぐパネルソーの木取りを計算する",
   "lang": "ja",
   "start_url": "./",

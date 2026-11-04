@@ -28,7 +28,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">Kidori Lite</span>
+        <span className="brand">Kidori Simple</span>
         <h1>{job ? job.name : '仕事を開いていません'}</h1>
       </header>
       {state.loadError && (

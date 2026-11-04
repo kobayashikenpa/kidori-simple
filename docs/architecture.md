@@ -1,4 +1,4 @@
-# kidori-lite 設計（第1版）
+# kidori-simple 設計（第1版）
 
 仕様の正は `docs/spec.md`。この文書は「どこに何を作るか」「データの形」「計算の流れ」「kidori から何を持ってくるか」を決める。
 仕様書に書いていないことで、ここで仮に決めたものには **（暫定）** を付け、`docs/tasks.md` 末尾の未決事項に挙げている。
@@ -294,8 +294,8 @@ export interface PackingResult {
 
 ## 4. 保存（`src/store`）
 
-- localStorage のキー：`kidori-lite.data.v1` に `AppData`、`kidori-lite.currentJobId` に開いている仕事の id、端末ごとの画面の状態（選んだタブ）は `kidori-lite.ui`（暫定）
-- kidori のキー（`kidori.*`）とは混ざらない（同じ `github.io` のドメインで localStorage を共有するため、キーの頭を必ず `kidori-lite.` にする）
+- localStorage のキー：`kidori-simple.data.v1` に `AppData`、`kidori-simple.currentJobId` に開いている仕事の id、端末ごとの画面の状態（選んだタブ）は `kidori-simple.ui`（暫定）
+- kidori のキー（`kidori.*`）とは混ざらない（同じ `github.io` のドメインで localStorage を共有するため、キーの頭を必ず `kidori-simple.` にする）
 - 読み書きはすべて try/catch。読めない・壊れているときは空の一覧で始め、「保存データを読めませんでした」と出す（データは上書きしない）
 - 書き込みは状態が変わるたびに 300ms ほどまとめて行う
 - 調整寸法の変更・削除は、全部の仕事の部材を見て、使っている仕事と部材を返す（`formula/usages.ts` の `adjustUsages(data, adjustId)` → `{ jobId, jobName, partId, partName, axes }[]`。一括削除は `adjustUsagesOf(data, adjustIds)` で、部材ごとに使っている `adjustIds` も付く）。画面で確認してから行う
@@ -319,7 +319,7 @@ export interface PackingResult {
 ## 6. 公開
 
 - GitHub Pages。`main` に入ったら、チェック → ビルド → 公開（kidori の `.github/workflows/deploy.yml` と同じ）
-- ホーム画面に追加できるよう `public/manifest.webmanifest` とアイコンを置く（アイコンは kidori と同じ。名前・短い名前は「Kidori Lite」。オーナー決定）
+- ホーム画面に追加できるよう `public/manifest.webmanifest` とアイコンを置く（アイコンは kidori と同じ。名前・短い名前は「Kidori Simple」。オーナー決定）
 
 ## 7. 第1.1版の変更（仕様書 15章）
 
@@ -355,8 +355,8 @@ kidori の `store/transfer/`（envelope・share・backup・read）を参考に�
 
 ```ts
 // envelope.ts
-interface JobFile    { app: 'kidori-lite'; kind: 'job';    version: 1; job: Job;    adjusts: Adjust[] } // adjusts はその仕事の式で使っているものだけ
-interface BackupFile { app: 'kidori-lite'; kind: 'backup'; version: 1; jobs: Job[]; adjusts: Adjust[] } // 全部の仕事と調整寸法の一覧
+interface JobFile    { app: 'kidori-simple'; kind: 'job';    version: 1; job: Job;    adjusts: Adjust[] } // adjusts はその仕事の式で使っているものだけ
+interface BackupFile { app: 'kidori-simple'; kind: 'backup'; version: 1; jobs: Job[]; adjusts: Adjust[] } // 全部の仕事と調整寸法の一覧
 type TransferFile = JobFile | BackupFile
 const READ_FAILED = '読み込めませんでした'
 ```
@@ -364,9 +364,9 @@ const READ_FAILED = '読み込めませんでした'
 | ファイル | 関数 | 内容 |
 |---|---|---|
 | `share.ts` | `jobFile(job, adjusts)` → `JobFile`、`buildJobFile(job, adjusts)` → JSON の文字列 | 切り出しチェック（`frozenSheets`）と仕上がりの完了を外す。調整寸法は式で使っているものだけ（アプリの一覧の並び） |
-| | `jobFileName(job)` → `本棚.kidori-lite.json` | 使えない文字（`\ / : * ? " < > |`・制御文字・空白）は `_` に置き換え、50 文字まで。空なら `仕事.kidori-lite.json`（暫定） |
+| | `jobFileName(job)` → `本棚.kidori-simple.json` | 使えない文字（`\ / : * ? " < > |`・制御文字・空白）は `_` に置き換え、50 文字まで。空なら `仕事.kidori-simple.json`（暫定） |
 | `backup.ts` | `backupFile(data)`・`buildBackupFile(data)` | 全部の仕事（チェックも）と調整寸法の一覧をそのまま。コピーした部材（`clipboard`）は入れない |
-| | `backupFileName(now)` → `kidori-lite-バックアップ-2026-10-22.json` | 端末の日付 |
+| | `backupFileName(now)` → `kidori-simple-バックアップ-2026-10-22.json` | 端末の日付 |
 | `read.ts` | `readTransferFile(text)` → `{ ok: true, kind: 'job', file, summary: { jobName, partCount } }` ／ `{ ok: true, kind: 'backup', file, summary: { jobCount, jobNames } }` ／ `{ ok: false, message: '読み込めませんでした' }` | 空・JSON でない・形が違う・`app` が違う（kidori のファイルを含む）・`version` が違う・20MB 超は読めない。例外を投げない。先頭の BOM は外す |
 | `importFile.ts` | `importTransfer(data, file, newId, now)` → `{ data, jobIds, addedAdjusts, message }` | 今の `AppData` に足した新しい `AppData`（下） |
 
@@ -652,5 +652,5 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
   - `restoreHistory(job, historyId, newId)`：設定と部材を履歴の写しに置き換え、`frozenSheets` を空にする。部材の id は `newId('part')` で新しく振る。履歴・名前・作った日は変えない
   - `setHistoryMemo(job, historyId, memo)`（同じメモなら同じ仕事を返す）・`removeHistory(job, historyId)`・`copyHistory(history)`（深い写し）
 - store：reducer に `addHistory`（`memo`。結果の `id` は残した履歴の id。id は `newId('history')`）・`restoreHistory`（`historyId`）・`setHistoryMemo`（`historyId`・`memo`）・`removeHistory`（`historyId`）。どれも `jobId` を省くと開いている仕事。変わったら仕事の `updatedAt` を付ける。`copyJob` は履歴も写す
-- 保存の形：キー（`kidori-lite.data.v1`）と `version: 1` は変えない。`readJob`（`shape.ts`）が、`history` の無い仕事（第2.0版までの保存データ・バックアップ・送るファイル）を空の履歴にして読む。`history` があって形が違う（並びでない・部材の形が違う・同じ id が2つ）ときは、今までの決まりどおり読めないとする
+- 保存の形：キー（`kidori-simple.data.v1`）と `version: 1` は変えない。`readJob`（`shape.ts`）が、`history` の無い仕事（第2.0版までの保存データ・バックアップ・送るファイル）を空の履歴にして読む。`history` があって形が違う（並びでない・部材の形が違う・同じ id が2つ）ときは、今までの決まりどおり読めないとする
 - ファイル：送るファイル（`jobFile`）は `history: []`。取り込むときも共有の履歴は外す。バックアップ（`backupFile`）は仕事のまま入れ、取り込むと履歴も戻す（履歴の部材の式の `{n:id}` も今の調整寸法の id につけ替える。履歴の id はそのまま）

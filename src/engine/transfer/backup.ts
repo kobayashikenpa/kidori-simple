@@ -19,7 +19,7 @@ export function buildBackupFile(data: Pick<AppData, 'jobs' | 'adjusts'>): string
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
-/** バックアップのファイル名：kidori-lite-バックアップ-2026-10-22.json（端末の日付） */
+/** バックアップのファイル名：kidori-simple-バックアップ-2026-10-22.json（端末の日付） */
 export function backupFileName(now: Date): string {
-  return `kidori-lite-バックアップ-${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}.json`
+  return `kidori-simple-バックアップ-${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}.json`
 }

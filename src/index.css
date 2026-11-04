@@ -1,4 +1,4 @@
-/* kidori-lite の見た目。色はすべてここの変数で決め、OS の設定（ライト／ダーク）に従って切り替える（kidori の配色をもとにした） */
+/* kidori-simple の見た目。色はすべてここの変数で決め、OS の設定（ライト／ダーク）に従って切り替える（kidori の配色をもとにした） */
 :root {
   color-scheme: light;
   --bg: #f1f3f0;
