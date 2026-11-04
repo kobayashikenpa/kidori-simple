@@ -1,4 +1,3 @@
-import { usableAdjusts } from '../engine/adjusts'
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from '../engine/dimensions'
 import { legacyShelfJob, shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
@@ -19,7 +18,7 @@ function env(now = T0): Env {
 function start(): StoreState {
   return initialState({
     status: 'ok',
-    data: { version: 1, jobs: [shelfJob()], adjusts: shelfAdjusts(), cellClip: null, adjustClip: null },
+    data: { version: 1, jobs: [shelfJob()], cellClip: null },
     currentJobId: 'job-shelf',
     canSave: true,
     numbering: { replaced: false, cleared: [] },
@@ -80,8 +79,6 @@ describe('仕事の操作', () => {
     const sample = r.state.data.jobs[1]
     expect(r.id).toBe(sample.id)
     expect(sample.name).toBe('見本 棚')
-    // 調整寸法は変わらない（第2.2版から見本は数字だけ）
-    expect(r.state.data.adjusts).toBe(s0.data.adjusts)
     expect(sample.parts.map((p) => [p.name, p.expr.W, p.expr.H])).toEqual([
       ['天板', '400', '1800'],
       ['側板', '400', '700'],
@@ -101,7 +98,7 @@ describe('仕事の操作', () => {
 
 describe('部材の操作（開いている仕事）', () => {
   it('足す・変える・消す。変えるたびに updatedAt', () => {
-    let r = run(start(), { type: 'addPart', part: { name: '地板', expr: { W: '全体.W', H: '300' } } }, env(T1))
+    let r = run(start(), { type: 'addPart', part: { name: '地板', expr: { W: '400', H: '300' } } }, env(T1))
     let job = currentJob(r.state)!
     expect(job.parts.at(-1)).toMatchObject({ id: r.id, name: '地板', quantity: 1, rotatable: false })
     expect(job.updatedAt).toBe(T1.toISOString())
@@ -112,10 +109,15 @@ describe('部材の操作（開いている仕事）', () => {
     expect(currentJob(r.state)!.parts).toHaveLength(4)
   })
 
-  it('同じ名前は断る（状態は変えない）', () => {
-    const s = start()
-    const r = reduce(s, { type: 'addPart', part: { name: '天板' } }, env())
-    expect(r).toEqual({ ok: false, message: '「天板」という部材はすでにあります' })
+  it('同じ名前の部材も足せる（第2.2版。仕様書 26.3）', () => {
+    const r = run(start(), { type: 'addPart', part: { name: '天板', expr: { W: '400', H: '1800' } } })
+    expect(currentJob(r.state)!.parts.filter((p) => p.name === '天板')).toHaveLength(2)
+  })
+
+  it('名前を変えても、ほかの部材の寸法は変わらない（式の書き換えはない）', () => {
+    const s0 = start()
+    const s = run(s0, { type: 'updatePart', partId: 'part-tenita', patch: { name: '天板A' } }).state
+    expect(currentJob(s)!.parts.map((p) => p.expr)).toEqual(currentJob(s0)!.parts.map((p) => p.expr))
   })
 
   it('複製は元の後ろに「棚板のコピー」', () => {
@@ -162,7 +164,7 @@ describe('セルのコピーと貼り付け（第1.2版）', () => {
       ['天板', '400'],
       ['側板', '400'],
     ])
-    expect(r.paste).toEqual({ pasted: 4, skipped: [], renamed: [] })
+    expect(r.paste).toEqual({ pasted: 4, skipped: [] })
     expect(currentJob(r.state)!.updatedAt).toBe(T1.toISOString())
   })
 
@@ -206,7 +208,7 @@ describe('切り取り・オートフィル・四角の範囲（第1.3版）', (
     expect(W(r.state)[1]).toBe('400') // 切り取っただけでは変えない
     r = run(r.state, { type: 'pasteCells', range: { top: 0, left: 1, rows: 1, cols: 1 } }, env(T1))
     expect(W(r.state).slice(0, 2)).toEqual(['400', ''])
-    expect(r.paste).toEqual({ pasted: 1, skipped: [], renamed: [] })
+    expect(r.paste).toEqual({ pasted: 1, skipped: [] })
     expect(r.state.data.cellClip).toEqual({ rows: 1, cols: 1, cells: [['400']] })
     // 2回目：元（天板の W）に入れ直しても、もう消さない
     r = run(r.state, { type: 'updatePart', partId: 'part-tenita', patch: { expr: { W: '400', H: '1800' } } })
@@ -241,16 +243,16 @@ describe('切り取り・オートフィル・四角の範囲（第1.3版）', (
     expect(r.state.data.cellClip?.cut).toBeUndefined()
   })
 
-  it('オートフィル：2行の範囲を下に5行引くと くり返して入る。名前は番号を振って入る（仕様書 18.3）', () => {
+  it('オートフィル：2行の範囲を下に5行引くと くり返して入る。名前も同じ名前のまま入る（第2.2版。仕様書 26.3）', () => {
     const r = run(start(), { type: 'fillCells', from: { top: 0, left: 0, rows: 2, cols: 2 }, to: { top: 0, left: 0, rows: 7, cols: 2 } }, env(T1))
     expect(currentJob(r.state)!.parts.map((p) => [p.name, p.expr.W])).toEqual([
       ['全体', '400'],
       ['天板', '400'],
-      ['全体1', '400'],
-      ['天板1', '400'],
-      ['全体2', '400'],
-      ['天板2', '400'],
-      ['全体3', '400'],
+      ['全体', '400'],
+      ['天板', '400'],
+      ['全体', '400'],
+      ['天板', '400'],
+      ['全体', '400'],
     ])
     expect(r.paste?.pasted).toBe(10)
     expect(r.paste?.skipped).toEqual([])
@@ -369,30 +371,11 @@ describe('仕事ごとの履歴（第2.1版。仕様書 25.1）', () => {
   })
 })
 
-describe('調整寸法（アプリ全体）', () => {
-  it('足す・変える・消す', () => {
-    let r = run(start(), { type: 'addAdjust', name: '逃げ', value: 1 })
-    expect(r.state.data.adjusts.at(-1)).toEqual({ id: r.id, name: '逃げ', value: 1 })
-    r = run(r.state, { type: 'updateAdjust', adjustId: r.id!, name: 'ほぞ', value: 15 })
-    expect(r.state.data.adjusts.at(-1)).toMatchObject({ name: 'ほぞ', value: 15 })
-    r = run(r.state, { type: 'removeAdjusts', adjustIds: [r.state.data.adjusts.at(-1)!.id] })
-    expect(r.state.data.adjusts.map((a) => a.name)).toEqual(['メラミン', 'シート'])
-  })
-
-  it('表示名が重なるものは足せない', () => {
-    expect(reduce(start(), { type: 'addAdjust', name: 'シート', value: 0.5 }, env())).toEqual({
-      ok: false,
-      message: '「シート0.5」はもうあります',
-    })
-  })
-
-})
-
 describe('読み込みの知らせ', () => {
   it('閉じられる', () => {
     const s = initialState({
       status: 'error',
-      data: { version: 1, jobs: [], adjusts: [], cellClip: null, adjustClip: null },
+      data: { version: 1, jobs: [], cellClip: null },
       currentJobId: null,
       message: '保存データを読めませんでした',
       canSave: false,
@@ -417,7 +400,7 @@ describe('式を数字に置き換えた知らせ（第2.2版。仕様書 26.4�
 
   it('前の版のファイルを取り込んだら、取り込みの結果の numbering を知らせに足す', () => {
     const s0 = start()
-    const file = { app: 'kidori-lite' as const, kind: 'job' as const, version: 1 as const, job: legacyShelfJob(), adjusts: shelfAdjusts() }
+    const file = { app: 'kidori-simple' as const, kind: 'job' as const, version: 1 as const, job: legacyShelfJob(), adjusts: shelfAdjusts() }
     const imported = importTransfer(s0.data, file, env().newId, T1)
     expect(imported.numbering.replaced).toBe(true)
     let s = run(s0, { type: 'replaceData', data: imported.data, numbering: imported.numbering }).state
@@ -438,15 +421,13 @@ describe('式を数字に置き換えた知らせ（第2.2版。仕様書 26.4�
 describe('取り込んだデータに置き換える', () => {
   it('共有のファイルを取り込むと、仕事がコピーとして足され、開いている仕事・今の仕事は変わらない', () => {
     const s0 = start()
-    const read = readTransferFile(buildJobFile(currentJob(s0)!, usableAdjusts(s0.data.adjusts)))
+    const read = readTransferFile(buildJobFile(currentJob(s0)!))
     if (!read.ok) throw new Error(read.message)
     const imported = importTransfer(s0.data, read.file, env().newId, T1)
     const s = run(s0, { type: 'replaceData', data: imported.data }).state
     expect(s.data.jobs).toHaveLength(2)
     expect(s.currentJobId).toBe('job-shelf')
     expect(s.data.jobs[0]).toBe(s0.data.jobs[0])
-    // メラミン1 は同じ表示名なので増えない
-    expect(usableAdjusts(s.data.adjusts)).toHaveLength(s0.data.adjusts.length)
     const copy = s.data.jobs[1]
     expect(copy.name).toBe(`${s0.data.jobs[0].name}のコピー`)
     expect(computeDimensions(copy).parts.map((p) => p.finished)).toEqual(
@@ -455,7 +436,7 @@ describe('取り込んだデータに置き換える', () => {
   })
 
   it('開いている仕事が新しいデータに無ければ閉じる', () => {
-    const s = run(start(), { type: 'replaceData', data: { version: 1, jobs: [], adjusts: [], cellClip: null, adjustClip: null } }).state
+    const s = run(start(), { type: 'replaceData', data: { version: 1, jobs: [], cellClip: null } }).state
     expect(s.currentJobId).toBeNull()
   })
 })

@@ -2,35 +2,34 @@
 import { describe, expect, it } from 'vitest'
 import { withHistory } from '../fixtures/history'
 import { freezeAt } from '../fixtures/progress'
-import { shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { shelfJob } from '../fixtures/shelf'
 import { backupFile, backupFileName, buildBackupFile } from './backup'
 
 describe('backupFile・buildBackupFile', () => {
   it('外側は app: kidori-simple・kind: backup・version 1・jobs・adjusts だけ。空白なしの JSON', () => {
-    const text = buildBackupFile({ jobs: [shelfJob()], adjusts: shelfAdjusts() })
+    const text = buildBackupFile({ jobs: [shelfJob()] })
     const data = JSON.parse(text)
     expect(Object.keys(data).sort()).toEqual(['adjusts', 'app', 'jobs', 'kind', 'version'])
     expect([data.app, data.kind, data.version]).toEqual(['kidori-simple', 'backup', 1])
     expect(text).not.toMatch(/\n/)
   })
 
-  it('全部の仕事（切り出しチェック・仕上がりの完了も）と、調整寸法の一覧を全部そのまま', () => {
+  it('全部の仕事（切り出しチェック・仕上がりの完了も）をそのまま。調整寸法は空の並び（第2.2版。前の版のアプリでも読める形）', () => {
     const used = freezeAt(shelfJob('job-a', '棚A'), 0, { partId: 'part-gawaita', n: 1 })
     used.parts[1] = { ...used.parts[1], finishedDone: true }
-    const adjusts = [...shelfAdjusts(), { id: 'adjust-hozo', name: 'ほぞ', value: 15 }]
-    const f = backupFile({ jobs: [used, shelfJob('job-b', '棚B')], adjusts })
+    const f = backupFile({ jobs: [used, shelfJob('job-b', '棚B')] })
     expect(f.jobs).toEqual([used, shelfJob('job-b', '棚B')])
-    expect(f.adjusts).toEqual(adjusts)
+    expect(f.adjusts).toEqual([])
   })
 
   it('履歴も入れる（第2.1版。仕様書 25.1）', () => {
     const job = withHistory(shelfJob('job-a', '棚A'), 'h-1', '初めの案')
-    const f = JSON.parse(buildBackupFile({ jobs: [job], adjusts: shelfAdjusts() }))
+    const f = JSON.parse(buildBackupFile({ jobs: [job] }))
     expect(f.jobs[0].history).toEqual(job.history)
   })
 
   it('仕事が無くても作れる', () => {
-    expect(backupFile({ jobs: [], adjusts: [] })).toEqual({ app: 'kidori-simple', kind: 'backup', version: 1, jobs: [], adjusts: [] })
+    expect(backupFile({ jobs: [] })).toEqual({ app: 'kidori-simple', kind: 'backup', version: 1, jobs: [], adjusts: [] })
   })
 })
 

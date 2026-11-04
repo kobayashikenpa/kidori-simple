@@ -27,11 +27,7 @@ class MemoryStorage implements KeyValueStorage {
 }
 
 const NOW = new Date('2026-10-21T09:00:00.000Z')
-const ids = () => {
-  let n = 0
-  return (p: string) => `${p}-${++n}`
-}
-const sample = (): AppData => ({ version: 1, jobs: [shelfJob()], adjusts: shelfAdjusts(), cellClip: null, adjustClip: null })
+const sample = (): AppData => ({ version: 1, jobs: [shelfJob()], cellClip: null })
 
 describe('キー', () => {
   it('すべて kidori-simple. で始まる', () => {
@@ -42,21 +38,17 @@ describe('キー', () => {
 })
 
 describe('保存と読み込み', () => {
-  it('何も無ければ初めの状態（仕事なし・メラミン1・シート0.5）', () => {
-    const r = loadSaved(new MemoryStorage(), ids(), NOW)
+  it('何も無ければ初めの状態（仕事なし。第2.2版から調整寸法の一覧は無い）', () => {
+    const r = loadSaved(new MemoryStorage(), NOW)
     expect(r.status).toBe('empty')
-    expect(r.data.jobs).toEqual([])
-    expect(r.data.adjusts.map((a) => [a.name, a.value])).toEqual([
-      ['メラミン', 1],
-      ['シート', 0.5],
-    ])
+    expect(r.data).toEqual({ version: 1, jobs: [], cellClip: null })
     expect(r.canSave).toBe(true)
   })
 
   it('書いたものを読み戻せる。開いていた仕事も戻る', () => {
     const st = new MemoryStorage()
     expect(saveSaved(st, sample(), 'job-shelf')).toEqual({ ok: true })
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data).toEqual(sample())
     expect(r.currentJobId).toBe('job-shelf')
@@ -85,13 +77,14 @@ describe('保存と読み込み', () => {
     })
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, v1)
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     // 第1.1版までの「コピーした部材」（clipboard）は読んで捨て、コピーしたセルは無し（第1.2版）。履歴は空（第2.1版）。
     // 式（全体.W・全体.H）は仕上がり寸法の数字に置き換える（第2.2版。仕様書 26.4）
     const { clipboard: _old, ...rest } = JSON.parse(v1) as { jobs: { parts: { expr: unknown }[] }[] } & Record<string, unknown>
     rest.jobs[0].parts[1].expr = { W: '400', H: '1800' }
-    expect(r.data).toEqual({ ...rest, jobs: rest.jobs.map((j) => ({ ...j, history: [] })), cellClip: null, adjustClip: null })
+    const { adjusts: _adjusts, ...withoutAdjusts } = rest
+    expect(r.data).toEqual({ ...withoutAdjusts, jobs: rest.jobs.map((j) => ({ ...j, history: [] })), cellClip: null })
     expect(r.numbering).toEqual({ replaced: true, cleared: [] })
     expect('clipboard' in r.data).toBe(false)
   })
@@ -102,7 +95,7 @@ describe('保存と読み込み', () => {
     for (const j of old.jobs) delete j.history
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify(old))
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data).toEqual(data)
     expect(r.data.jobs[0].history).toEqual([])
@@ -134,7 +127,7 @@ describe('保存と読み込み', () => {
     ]
     const st = new MemoryStorage()
     saveSaved(st, data, null)
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data).toEqual(data)
   })
@@ -144,7 +137,7 @@ describe('保存と読み込み', () => {
     old.jobs[1].settings.cutMode = 'horizontal'
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify(old))
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data.jobs.map((j) => j.settings.cutMode)).toEqual(['vertical', 'horizontal'])
     expect(r.data.jobs[0]).toEqual({ ...shelfJob(), settings: { ...shelfJob().settings, cutMode: 'vertical' } })
@@ -160,7 +153,7 @@ describe('保存と読み込み', () => {
     delete data.cellClip
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify(data))
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data).toEqual(sample())
   })
@@ -170,12 +163,12 @@ describe('保存と読み込み', () => {
     data.cellClip = { rows: 2, cols: 2, cells: [['棚板', '380'], ['', '3']] }
     const st = new MemoryStorage()
     saveSaved(st, data, null)
-    expect(loadSaved(st, ids(), NOW).data).toEqual(data)
+    expect(loadSaved(st, NOW).data).toEqual(data)
     for (const bad of [{ rows: 2, cols: 1, cells: [['1']] }, { rows: 1, cols: 5, cells: [['', '', '', '', '']] }, { rows: 1, cols: 1, cells: [[3]] }, 'x']) {
       st.setItem(DATA_KEY, JSON.stringify({ ...data, cellClip: bad }))
-      const r = loadSaved(st, ids(), NOW)
+      const r = loadSaved(st, NOW)
       expect(r.status).toBe('ok')
-      expect(r.data).toEqual({ ...data, cellClip: null, adjustClip: null })
+      expect(r.data).toEqual({ ...data, cellClip: null })
     }
   })
 
@@ -184,10 +177,10 @@ describe('保存と読み込み', () => {
     data.cellClip = { rows: 1, cols: 2, cells: [['棚板', '3']], cut: { jobId: 'job-shelf', range: { top: 3, left: 2, rows: 1, cols: 2 } } }
     const st = new MemoryStorage()
     saveSaved(st, data, null)
-    expect(loadSaved(st, ids(), NOW).data).toEqual(data)
+    expect(loadSaved(st, NOW).data).toEqual(data)
     const v12 = { rows: 1, cols: 1, cells: [['400']] }
     st.setItem(DATA_KEY, JSON.stringify({ ...data, cellClip: v12 }))
-    expect(loadSaved(st, ids(), NOW).data.cellClip).toEqual(v12)
+    expect(loadSaved(st, NOW).data.cellClip).toEqual(v12)
   })
 
   it('切り取りの元の形だけが違うときは、元を外してふつうのコピーとして読む', () => {
@@ -202,7 +195,7 @@ describe('保存と読み込み', () => {
       { jobId: 'job-shelf', range: { top: -1, left: 0, rows: 1, cols: 2 } },
     ]) {
       st.setItem(DATA_KEY, JSON.stringify({ ...data, cellClip: { ...clip, cut: badCut } }))
-      const r = loadSaved(st, ids(), NOW)
+      const r = loadSaved(st, NOW)
       expect(r.status).toBe('ok')
       expect(r.data.cellClip).toEqual(clip)
     }
@@ -216,7 +209,7 @@ describe('保存と読み込み', () => {
     )
     const st = new MemoryStorage()
     saveSaved(st, data, null)
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data).toEqual(data)
   })
@@ -224,9 +217,9 @@ describe('保存と読み込み', () => {
   it('開いていた仕事が無ければ開いていない状態', () => {
     const st = new MemoryStorage()
     saveSaved(st, sample(), null)
-    expect(loadSaved(st, ids(), NOW).currentJobId).toBeNull()
+    expect(loadSaved(st, NOW).currentJobId).toBeNull()
     st.setItem(CURRENT_JOB_KEY, 'nope')
-    expect(loadSaved(st, ids(), NOW).currentJobId).toBeNull()
+    expect(loadSaved(st, NOW).currentJobId).toBeNull()
   })
 
   it('kidori のキーには触らない', () => {
@@ -249,7 +242,7 @@ describe('保存と読み込み', () => {
 describe('壊れた保存データ', () => {
   it.each([
     ['JSON でない', '{こわれた'],
-    ['形が違う', JSON.stringify({ version: 1, jobs: 'x', adjusts: [], cellClip: null, adjustClip: null })],
+    ['形が違う', JSON.stringify({ version: 1, jobs: 'x', cellClip: null })],
     ['版が違う', JSON.stringify({ ...sample(), version: 2 })],
     ['部材の枚数がおかしい', JSON.stringify({ ...sample(), jobs: [{ ...shelfJob(), parts: [{ ...shelfJob().parts[0], quantity: -1 }] }] })],
     ['部材の枚数が文字', JSON.stringify({ ...sample(), jobs: [{ ...shelfJob(), parts: [{ ...shelfJob().parts[0], quantity: '1' }] }] })],
@@ -261,7 +254,7 @@ describe('壊れた保存データ', () => {
   ])('%s：空の一覧で始め「保存データを読めませんでした」。元のデータは書き換えず、控えに残す', (_label, raw) => {
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, raw)
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('error')
     expect(r.data.jobs).toEqual([])
     expect(r.message).toMatch(/^保存データを読めませんでした/)
@@ -274,7 +267,7 @@ describe('壊れた保存データ', () => {
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, '{こわれた')
     st.failWrite = true
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('error')
     expect(r.canSave).toBe(false)
     expect(st.getItem(DATA_KEY)).toBe('{こわれた')
@@ -284,7 +277,7 @@ describe('壊れた保存データ', () => {
     const st = new MemoryStorage()
     st.setItem(`${BROKEN_KEY_PREFIX}.${NOW.toISOString()}`, '前の控え')
     st.setItem(DATA_KEY, '{こわれた')
-    loadSaved(st, ids(), NOW)
+    loadSaved(st, NOW)
     expect(st.getItem(`${BROKEN_KEY_PREFIX}.${NOW.toISOString()}`)).toBe('前の控え')
     expect(st.getItem(`${BROKEN_KEY_PREFIX}.${NOW.toISOString()}.1`)).toBe('{こわれた')
   })
@@ -292,10 +285,10 @@ describe('壊れた保存データ', () => {
   it('読めない（例外）・localStorage が無いときも画面は始められる。保存はしない', () => {
     const st = new MemoryStorage()
     st.failRead = true
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r).toMatchObject({ status: 'error', canSave: false })
     expect(r.data.jobs).toEqual([])
-    expect(loadSaved(null, ids(), NOW)).toMatchObject({ status: 'error', canSave: false })
+    expect(loadSaved(null, NOW)).toMatchObject({ status: 'error', canSave: false })
   })
 
   it('同じ id の仕事が2つあれば読めないとする', () => {
@@ -304,14 +297,14 @@ describe('壊れた保存データ', () => {
 })
 
 describe('前のデータの式を数字に置き換える（第2.2版。仕様書 26.4）', () => {
-  /** 第2.1版の保存データ（見本の棚が式・調整寸法の一覧つき） */
-  const legacy = () => ({ ...sample(), jobs: [legacyShelfJob()] })
+  /** 第2.1版の保存データ（見本の棚が式・調整寸法の一覧・調整寸法の表のコピーつき） */
+  const legacy = () => ({ ...sample(), jobs: [legacyShelfJob()], adjusts: shelfAdjusts(), adjustClip: { rows: 1, cols: 1, cells: [['メラミン']] } })
 
   it('開いたときに式を仕上がり寸法の数字にし、置き換えたことを返す（エラーで空にしたものは無し）', () => {
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify(legacy()))
     st.setItem(CURRENT_JOB_KEY, 'job-shelf')
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data.jobs[0].parts).toEqual(shelfJob().parts)
     expect(r.numbering).toEqual({ replaced: true, cleared: [] })
@@ -323,12 +316,12 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     const st = new MemoryStorage()
     const raw = JSON.stringify(legacy())
     st.setItem(DATA_KEY, raw)
-    loadSaved(st, ids(), NOW)
+    loadSaved(st, NOW)
     const backups = [...st.map.keys()].filter((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))
     expect(backups).toEqual([`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}`])
     expect(st.getItem(backups[0])).toBe(raw)
     expect(JSON.parse(st.getItem(DATA_KEY)!).jobs[0].parts).toEqual(shelfJob().parts)
-    const again = loadSaved(st, ids(), NOW)
+    const again = loadSaved(st, NOW)
     expect(again.numbering).toEqual({ replaced: false, cleared: [] })
     expect([...st.map.keys()].filter((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))).toHaveLength(1)
   })
@@ -337,7 +330,7 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     const st = new MemoryStorage()
     st.setItem(`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}`, '前の控え')
     st.setItem(DATA_KEY, JSON.stringify(legacy()))
-    loadSaved(st, ids(), NOW)
+    loadSaved(st, NOW)
     expect(st.getItem(`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}`)).toBe('前の控え')
     expect(st.getItem(`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}.1`)).not.toBeNull()
   })
@@ -347,7 +340,7 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     const raw = JSON.stringify(legacy())
     st.setItem(DATA_KEY, raw)
     st.failWrite = true
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.status).toBe('ok')
     expect(r.data.jobs[0].parts).toEqual(shelfJob().parts)
     expect(r.canSave).toBe(false)
@@ -363,7 +356,7 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     ]
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify(data))
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.data.jobs[0].parts[4].expr).toEqual({ W: '', H: '600' })
     expect(r.data.jobs[0].history[0].parts.map((p) => p.expr)).toEqual(shelfJob().parts.map((p) => p.expr))
     expect(r.numbering).toEqual({ replaced: true, cleared: [{ jobId: 'job-shelf', jobName: '棚', partName: '扉', axis: 'W' }] })
@@ -373,25 +366,43 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     const data = { ...legacy(), adjusts: [{ id: 'adjust-melamine', name: 'メラミン', value: 2 }] }
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify(data))
-    expect(loadSaved(st, ids(), NOW).data.jobs[0].parts[3].expr.W).toBe('378')
+    expect(loadSaved(st, NOW).data.jobs[0].parts[3].expr.W).toBe('378')
   })
 
   it('式の入ったアプリ内のコピー（セル）は捨てる。数字・名前だけのコピーは残す', () => {
     const st = new MemoryStorage()
     st.setItem(DATA_KEY, JSON.stringify({ ...sample(), cellClip: { rows: 1, cols: 2, cells: [['棚板', '天板.W - 20']] } }))
-    expect(loadSaved(st, ids(), NOW).data.cellClip).toBeNull()
+    expect(loadSaved(st, NOW).data.cellClip).toBeNull()
     const keep = { rows: 1, cols: 2, cells: [['棚板', '379']] }
     st.setItem(DATA_KEY, JSON.stringify({ ...sample(), cellClip: keep }))
-    expect(loadSaved(st, ids(), NOW).data.cellClip).toEqual(keep)
+    expect(loadSaved(st, NOW).data.cellClip).toEqual(keep)
   })
 
   it('式が無い保存データは置き換えず、控えも作らず、書き直さない', () => {
     const st = new MemoryStorage()
     const raw = JSON.stringify(sample())
     st.setItem(DATA_KEY, raw)
-    const r = loadSaved(st, ids(), NOW)
+    const r = loadSaved(st, NOW)
     expect(r.numbering).toEqual({ replaced: false, cleared: [] })
     expect([...st.map.keys()].some((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))).toBe(false)
+    expect(st.getItem(DATA_KEY)).toBe(raw)
+  })
+
+  it('置き換えたあとの保存データは、調整寸法の一覧と調整寸法の表のコピーを持たない（第2.2版。仕様書 26.2）', () => {
+    const st = new MemoryStorage()
+    st.setItem(DATA_KEY, JSON.stringify(legacy()))
+    const r = loadSaved(st, NOW)
+    expect(Object.keys(r.data).sort()).toEqual(['cellClip', 'jobs', 'version'])
+    expect(Object.keys(JSON.parse(st.getItem(DATA_KEY)!)).sort()).toEqual(['cellClip', 'jobs', 'version'])
+  })
+
+  it('式の無い前の保存データ（調整寸法の一覧あり）も読み、一覧は捨てる。置き換えないので書き直さない', () => {
+    const st = new MemoryStorage()
+    const raw = JSON.stringify({ ...sample(), adjusts: shelfAdjusts(), adjustClip: null })
+    st.setItem(DATA_KEY, raw)
+    const r = loadSaved(st, NOW)
+    expect(r.data).toEqual(sample())
+    expect(r.numbering.replaced).toBe(false)
     expect(st.getItem(DATA_KEY)).toBe(raw)
   })
 

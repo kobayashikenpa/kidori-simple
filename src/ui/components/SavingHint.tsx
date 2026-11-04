@@ -3,17 +3,16 @@
 // kidori の components/SavingHints.tsx をもとに、材料ごとの一覧・部材ごとの切り代の知らせを外し、板1種類のお知らせ1つにしたもの
 import { useDeferredValue, useMemo } from 'react'
 import { findSavingHint } from '../../engine/hints/saving'
-import type { Adjust, Job } from '../../engine/types'
+import type { Job } from '../../engine/types'
 
-export function SavingHint({ job, adjusts }: { job: Job; adjusts: readonly Adjust[] }) {
-  // 計算に使うのは 部材・設定・固定した1枚・調整寸法 だけ。更新日時・名前・履歴は計算に使わないので、計算し直しの理由にしない
+export function SavingHint({ job }: { job: Job }) {
+  // 計算に使うのは 部材・設定・固定した1枚 だけ。更新日時・名前・履歴は計算に使わないので、計算し直しの理由にしない
   const { id, createdAt, parts, settings, frozenSheets } = job
   const input = useMemo(
     () => ({
       job: { id, name: '', createdAt, updatedAt: createdAt, parts, settings, frozenSheets, history: [] } satisfies Job,
-      adjusts,
     }),
-    [id, createdAt, parts, settings, frozenSheets, adjusts],
+    [id, createdAt, parts, settings, frozenSheets],
   )
   // 何回も木取りを計算し直すので、木取りの結果を先に出してから後回しで計算する（最初は null）
   const deferred = useDeferredValue<typeof input | null>(input, null)

@@ -16,8 +16,8 @@ const isAdjustList = (v: unknown): boolean => Array.isArray(v) && v.every(isAdju
 
 /**
  * 選んだファイルの中身（文字列）を読む。
- * 空・JSON でない・形が違う・app が kidori-simple でない（kidori のファイルを含む）・版が違う・20MB 超は「読み込めませんでした」。
- * 仕事・部材・調整寸法の形の確かめは保存データの読み込みと同じ（engine/shape.ts）
+ * 空・JSON でない・形が違う・app が kidori-simple・kidori-lite（分ける前のキドリライト）でない（kidori のファイルを含む）・版が違う・20MB 超は「読み込めませんでした」。
+ * 仕事・部材の形の確かめは保存データの読み込みと同じ（engine/shape.ts）。前の版の調整寸法の一覧（adjusts）も読む（式の置き換えに使う）
  */
 export function readTransferFile(text: string): TransferRead {
   try {

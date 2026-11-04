@@ -32,7 +32,7 @@ export function duplicateName(job: Pick<Job, 'parts'>, name: string): string {
 export type DuplicateResult = { ok: true; job: Job; partId: string } | { ok: false; message: string }
 
 /**
- * 部材の複製：式・枚数・回転を写し、名前は duplicateName、元の部材のすぐ後ろに足す。
+ * 部材の複製：W・H・枚数・回転を写し、名前は duplicateName、元の部材のすぐ後ろに足す。
  * id は newId('part')（partId で返す。画面で編集を開くため）、仕上がりの完了は外す
  */
 export function duplicatePart(job: Job, partId: string, newId: (prefix: string) => string): DuplicateResult {

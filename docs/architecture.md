@@ -654,3 +654,29 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
 - store：reducer に `addHistory`（`memo`。結果の `id` は残した履歴の id。id は `newId('history')`）・`restoreHistory`（`historyId`）・`setHistoryMemo`（`historyId`・`memo`）・`removeHistory`（`historyId`）。どれも `jobId` を省くと開いている仕事。変わったら仕事の `updatedAt` を付ける。`copyJob` は履歴も写す
 - 保存の形：キー（`kidori-simple.data.v1`）と `version: 1` は変えない。`readJob`（`shape.ts`）が、`history` の無い仕事（第2.0版までの保存データ・バックアップ・送るファイル）を空の履歴にして読む。`history` があって形が違う（並びでない・部材の形が違う・同じ id が2つ）ときは、今までの決まりどおり読めないとする
 - ファイル：送るファイル（`jobFile`）は `history: []`。取り込むときも共有の履歴は外す。バックアップ（`backupFile`）は仕事のまま入れ、取り込むと履歴も戻す（履歴の部材の式の `{n:id}` も今の調整寸法の id につけ替える。履歴の id はそのまま）
+
+## 15. 第2.2版の変更（仕様書 26章）
+
+### 15.1 W・H は数字だけ（E-20。spec 26.1。`src/engine/size.ts`・`src/engine/dimensions/index.ts`）
+
+- `Part.expr` の形（文字）は変えず、中身を「空か、半角の数字（小数可）」にする（暫定。前のデータ・ファイル・コピーの形をそのまま読めるように）。読み方は `size.ts`：`readSize(text)`（`{ ok: true, value }`／空・「12.」は syntax ＋ incomplete、0 以下は nonPositive、それ以外は syntax）、`isSizeText`（保存の形）、`isSizeInput`（キーで入れている途中も含む形）、`pastedSize`（貼り付け）、`sizeText`（小数第1位の数字の文字）
+- **`computeDimensions(job)`**：調整寸法の引数をなくした。仕上がり ＝ 入れた数字、木取り ＝ 仕上がり ＋ 切り代。出すエラーは syntax と nonPositive だけ。`findSavingHint(job)` も同じく引数をなくした
+- 貼り付け・オートフィルの W・H は数字だけ（`notSize`「W・H には 0 より大きい数だけ貼れます」）
+
+### 15.2 前のデータの式を数字に置き換える（E-20。spec 26.4。`src/engine/migrate/`）
+
+- `migrate/legacyDimensions.ts`：第2.1版の式の計算（`legacyComputeDimensions(job, adjusts)`）。置き換え専用。`formula/`（tokenize・parse・evaluate・display・units）と `dimensions/resolve.ts` は、これと画面（U-27 まで）が使うので残した
+- `migrate/numbers.ts`：
+  - `numberizeJob(job, adjusts)`・`numberizeJobs(jobs, adjusts)` → `{ job(s), report: NumberingReport }`。式（`isSizeInput` でない W・H）を、そのデータの調整寸法の一覧（`LegacyAdjust[]`。書きかけの行は使えない）で計算した仕上がり寸法の数字（小数第1位）にする。エラーは空にし `report.cleared`（`ClearedSize`：jobId・jobName・partName・axis・履歴なら history）に入れる。履歴の部材も、その履歴の中で計算する。式が無ければ同じ仕事を返す
+  - `NumberingReport = { replaced, cleared }`・`NO_NUMBERING`・`mergeNumbering`・`numberingMessage(report)`（知らせの文）・`clipHasFormula(clip)`
+- 保存データ（`store/storage.ts`）：`readAppData(raw)` → `{ data, numbering }`（`parseAppData` は data だけ）。`loadSaved` は置き換えたら、元の文字を `BEFORE_NUMBERS_KEY_PREFIX`（`kidori-lite.data.v1.before-numbers`）＋日時の控えに残してから、置き換えたデータを保存し直す。控えを残せなければ保存しない（`canSave: false`）。`LoadResult.numbering`
+- ファイル（`transfer/importFile.ts`）：`importTransfer` はファイルの `adjusts` で置き換えてから足す。結果に `numbering`（仕事の名前・id は取り込んだあと）。調整寸法の一覧に足すのはやめた（`addedAdjusts` はなくした）
+- store：`StoreState.numbering`（保存しない）。`initialState` が `LoadResult.numbering` を入れ、`{ type: 'replaceData', data, numbering? }` でつなげ、`{ type: 'dismissNumbering' }` で消す
+
+### 15.3 調整寸法・名前の重なり・名前の番号振りをなくす（E-21。spec 26.2・26.3）
+
+- `AppData = { version: 1, jobs, cellClip }`。`adjusts`・`adjustClip` と、`AdjustRow`・`AdjustClip`・`AdjustCellPos` などの型、`engine/adjusts.ts`・`engine/clipboard/adjustCells.ts`・`engine/formula/usages.ts`・`engine/formula/rename.ts`、store の調整寸法の操作（`addAdjust`・`updateAdjust`・`removeAdjusts`・`validateAdjust`・調整寸法の表の操作・`adjustTableOutcome`）、`defaultAdjusts`・`adjustNameKey`・`referableParts` はなくした。`Adjust`（前の版の調整寸法）と `adjustName` は置き換え・式の表示のために残した
+- `shape.ts` の `readLegacyAdjusts`：前の保存データの `adjusts` を置き換えのためだけに読む（無ければ空）
+- 部材の名前：同じ名前でもよい・使える文字の決まりも無い（暫定）。名前を変えても式の書き換えは無い。貼り付け・オートフィルは書いたまま（番号を振らない。`renamed` はなくした）
+- 送るファイル・バックアップ：`jobFile(job)`・`backupFile({ jobs })`。`adjusts` はいつも `[]`（形は変えない）
+

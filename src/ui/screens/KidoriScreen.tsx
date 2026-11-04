@@ -7,7 +7,6 @@
 // チェックの付け外しは store の setPartCheck（engine の setPartCheck）。
 // pieceId は1枚の中でだけ重ならないので、1枚をまたぐキーは1枚の id（固定した1枚の id、計算した1枚は「c」＋何枚目か）と組にする
 // 部材・設定・調整寸法・固定した1枚が変わったときだけ計算し直す（useMemo）
-import { usableAdjusts } from '../../engine/adjusts'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { computeDimensions } from '../../engine/dimensions'
 import { packJob } from '../../engine/packing'
@@ -57,8 +56,7 @@ const DRIFT_REASON: Record<FrozenSheetView['drift'][number]['reason'], string> =
 }
 
 export function KidoriScreen() {
-  const { job, data, dispatch } = useJobStore()
-  const adjusts = usableAdjusts(data.adjusts)
+  const { job, dispatch } = useJobStore()
   // 部材・設定・固定した1枚が変わったときだけ計算する。
   // 履歴に残す・メモを直す・削除でも仕事は新しくなるので、計算に使わない 履歴・更新日時 を外したものを条件にする（SavingHint と同じ）
   const { id, name, createdAt, parts, settings, frozenSheets } = job ?? {}
@@ -192,7 +190,7 @@ export function KidoriScreen() {
         </div>
       )}
 
-      {!empty && <SavingHint job={job} adjusts={adjusts} />}
+      {!empty && <SavingHint job={job} />}
 
       {result.unplaced.length > 0 && (
         <div className="card kd-issues err" role="alert">

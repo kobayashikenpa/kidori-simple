@@ -10,7 +10,7 @@ import { JobStoreContext, type JobStoreValue } from './useJobStore'
 const SAVE_DELAY_MS = 300
 
 function init(): StoreState {
-  return initialState(loadSaved(browserStorage(), newId))
+  return initialState(loadSaved(browserStorage()))
 }
 
 export function JobStoreProvider({ children }: { children: ReactNode }) {

@@ -3,7 +3,7 @@
 // キーはすべて「kidori-simple.」で始める（kidori と同じ github.io のドメインで localStorage を分け合うため。kidori は「kidori.」）
 import { defaultAppData } from '../engine/defaults'
 import { clipHasFormula, NO_NUMBERING, numberizeJobs, type NumberingReport } from '../engine/migrate/numbers'
-import { isRecord, readAdjustClip, readAdjustRows, readCellClip, readJobs } from '../engine/shape'
+import { isRecord, readCellClip, readJobs, readLegacyAdjusts } from '../engine/shape'
 import type { AppData } from '../engine/types'
 
 /** 保存データ（AppData）のキー */
@@ -58,11 +58,12 @@ export function browserStorage(): KeyValueStorage | null {
 
 // ---------- 中身の検査 ----------
 // 手で書き換えたデータや途中までのデータで画面が真っ白にならないよう、形が違えば「読めない」とする。
-// 部材・仕事・調整寸法の形の確かめは、共有・バックアップのファイルの読み込みと同じもの（engine/shape.ts）
+// 部材・仕事の形の確かめは、共有・バックアップのファイルの読み込みと同じもの（engine/shape.ts）
 
 /**
  * 保存データを読む（第2.2版）。読めれば中身と、前の版の式を数字に置き換えた結果。読めなければ null。
  * - 仕事（今の部材・履歴の中の部材）の式を、保存データの中の調整寸法の一覧で計算した仕上がり寸法の数字にする（engine/migrate/numbers.ts）
+ * - 調整寸法の一覧（adjusts）・調整寸法の表のコピー（adjustClip）は置き換えに使ってから捨てる（仕様書 26.2）
  * - 式の入ったアプリ内のコピー（cellClip）は捨てる（仕様書 26.4）
  */
 export function readAppData(raw: unknown): { data: AppData; numbering: NumberingReport } | null {
@@ -70,8 +71,8 @@ export function readAppData(raw: unknown): { data: AppData; numbering: Numbering
   // 第1.3版までの切り方「おまかせ」は縦切り優先にして読む（readJobs。仕様書 18.2）
   const jobs = readJobs(raw.jobs)
   if (!jobs) return null
-  // 調整寸法の表（第1.7版から書きかけの行も。第1.6版までの調整寸法もそのまま読める）
-  const adjusts = readAdjustRows(raw.adjusts)
+  // 前の版の調整寸法の表（式の置き換えにだけ使う。無ければ空。形が違えば前の版と同じく読めない）
+  const adjusts = readLegacyAdjusts(raw.adjusts)
   if (!adjusts) return null
   // 同じ id の仕事が2つあると開く・消すがおかしくなるので読めないとする
   if (new Set(jobs.map((j) => j.id)).size !== jobs.length) return null
@@ -79,10 +80,8 @@ export function readAppData(raw: unknown): { data: AppData; numbering: Numbering
   // 第1.1版の「コピーした部材」（clipboard）は使わなくなったので、あっても読んで捨てる。式が入っていれば捨てる（第2.2版）
   const clip = readCellClip(raw.cellClip)
   const cellClip = clip && clipHasFormula(clip) ? null : clip
-  // 調整寸法の表のクリップ（第1.7版）。無い・形が違えば null
-  const adjustClip = readAdjustClip(raw.adjustClip)
   const numbered = numberizeJobs(jobs, adjusts)
-  return { data: { version: 1, jobs: numbered.jobs, adjusts, cellClip, adjustClip }, numbering: numbered.report }
+  return { data: { version: 1, jobs: numbered.jobs, cellClip }, numbering: numbered.report }
 }
 
 /** 保存データとして読めるか。読めれば AppData（前の版の式は数字に置き換えたもの。readAppData）、読めなければ null */
@@ -118,8 +117,8 @@ function backupRaw(storage: KeyValueStorage, prefix: string, raw: string, now: D
  *   控えを残せなければ、置き換えた中身で始めるが元のデータは書き換えず、このあとの変更も保存しない
  * - 開いていた仕事が無くなっていれば、開いていない状態にする
  */
-export function loadSaved(storage: KeyValueStorage | null, newId: (prefix: string) => string, now: Date = new Date()): LoadResult {
-  const fresh = () => defaultAppData(newId)
+export function loadSaved(storage: KeyValueStorage | null, now: Date = new Date()): LoadResult {
+  const fresh = () => defaultAppData()
   const numbering = NO_NUMBERING
   if (!storage) {
     return { status: 'error', data: fresh(), currentJobId: null, message: 'このブラウザでは保存できません。画面を閉じると入力は消えます', canSave: false, numbering }

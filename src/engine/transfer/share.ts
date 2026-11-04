@@ -1,16 +1,13 @@
 // 仕事1つのファイル（この仕事を送る。仕様書 15.3）。React・ブラウザに依存しない。
-// kidori の store/transfer/share.ts を参考に作り直したもの（材料・フラッシュ・重ね切りの組は無い。調整寸法はアプリ全体の一覧から選んで入れる）
-import { adjustIdsInExpr } from '../formula/usages'
-import { usableAdjusts } from '../adjusts'
-import { AXES, type AdjustRow, type Job } from '../types'
+// kidori の store/transfer/share.ts を参考に作り直したもの（材料・フラッシュ・重ね切りの組は無い）
+import type { Job } from '../types'
 import { TRANSFER_APP, TRANSFER_VERSION, type JobFile } from './envelope'
 
 /**
- * 送る中身：切り出しチェック（固定した1枚）・仕上がりの完了・履歴（第2.1版。仕様書 25.1）を外した仕事と、その仕事の式で使っている調整寸法だけ
- * （adjusts＝アプリ全体の調整寸法の表の並び。削除した調整寸法・書きかけの行は入らない（第1.7版））。元の仕事は変えない
+ * 送る中身：切り出しチェック（固定した1枚）・仕上がりの完了・履歴（第2.1版。仕様書 25.1）を外した仕事。元の仕事は変えない。
+ * 調整寸法は第2.2版（仕様書 26.2）でなくしたので、adjusts はいつも空の並び（前の版のアプリでも読めるよう、形は変えない）
  */
-export function jobFile(job: Job, adjusts: readonly AdjustRow[]): JobFile {
-  const used = new Set(job.parts.flatMap((p) => AXES.flatMap((a) => adjustIdsInExpr(p.expr[a]))))
+export function jobFile(job: Job): JobFile {
   return {
     app: TRANSFER_APP,
     kind: 'job',
@@ -22,13 +19,13 @@ export function jobFile(job: Job, adjusts: readonly AdjustRow[]): JobFile {
       frozenSheets: [],
       history: [],
     },
-    adjusts: usableAdjusts(adjusts).filter((a) => used.has(a.id)).map((a) => ({ ...a })),
+    adjusts: [],
   }
 }
 
 /** 仕事1つのファイルの中身（JSON の文字列。空白なし） */
-export function buildJobFile(job: Job, adjusts: readonly AdjustRow[]): string {
-  return JSON.stringify(jobFile(job, adjusts))
+export function buildJobFile(job: Job): string {
+  return JSON.stringify(jobFile(job))
 }
 
 /** ファイル名に使えない文字（\ / : * ? " < > |）・制御文字・空白（半角・全角） */

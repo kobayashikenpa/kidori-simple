@@ -4,11 +4,9 @@ import { duplicatePart } from './clipboard/copy'
 import { computeDimensions } from './dimensions'
 import { freezeAt, withPart } from './fixtures/progress'
 import { shelfJob } from './fixtures/shelf'
-import { renamePart } from './formula/rename'
-import { validatePartName } from './formula/tokenize'
 import { packJob } from './packing'
 import { compareStandardSizes } from './packing/sizes'
-import { cutQuantity, hasName, partLabel, partLabels, referableParts } from './parts'
+import { cutQuantity, hasName, partLabel, partLabels } from './parts'
 import { frozenSheetViews } from './progress/frozen'
 import { partCutProgress } from './progress/partProgress'
 import { sheetPartChecklist } from './progress/sheetChecklist'
@@ -47,11 +45,10 @@ describe('表示用の名前（partLabel）', () => {
     expect(m.get('p5')).toBe('#5')
   })
 
-  it('hasName・referableParts：名前の無い部材は式から参照できない（式のボタンの一覧に出さない）', () => {
+  it('hasName：前後の空白を外して空でないか', () => {
     const job = withParts(part('p5', '', '300', '400', 1))
     expect(hasName(job.parts[4])).toBe(false)
     expect(hasName(job.parts[0])).toBe(true)
-    expect(referableParts(job.parts).map((p) => p.id)).toEqual(['part-zentai', 'part-tenita', 'part-gawaita', 'part-tanaita'])
   })
 
   it('cutQuantity：切り出す枚数。null（枚数が空）と 0 は 0', () => {
@@ -62,16 +59,6 @@ describe('表示用の名前（partLabel）', () => {
 })
 
 describe('名前が空の部材', () => {
-  it('名前が空の部材が2つあっても重なりにならない（validatePartName・renamePart）', () => {
-    const job = withParts(part('p5', '', '300', '400', 1), part('p6', '', '300', '400', 1))
-    expect(validatePartName('', job.parts.map((p) => p.name))).toBeNull()
-    // 名前のある部材を空にできる。空どうしは重ならない
-    const r = renamePart(job.parts, 'part-gawaita', '')
-    expect(r.ok).toBe(true)
-    // 名前のある部材どうしは今までどおり重なり
-    expect(validatePartName('天板', job.parts.map((p) => p.name))).toBe('「天板」という部材はすでにあります')
-  })
-
   it('名前が空の部材も寸法を計算し、木取りに入る（配置図の名前は #行番号）', () => {
     const job = withParts(part('p5', '', '300', '400', 2))
     const dims = dimsOf(job)

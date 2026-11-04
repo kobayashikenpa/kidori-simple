@@ -1,19 +1,18 @@
 // バックアップのファイル（全部・ファイル。仕様書 15.4）。React・ブラウザに依存しない。
-// kidori の store/transfer/backup.ts を参考に作り直したもの（調整寸法の一覧もアプリ全体なので入れる）
-import { usableAdjusts } from '../adjusts'
+// kidori の store/transfer/backup.ts を参考に作り直したもの
 import type { AppData } from '../types'
 import { TRANSFER_APP, TRANSFER_VERSION, type BackupFile } from './envelope'
 
 /**
- * バックアップの中身：全部の仕事（切り出しチェック・仕上がりの完了・履歴も）と調整寸法の一覧。コピーしたセルは入れない。
- * 調整寸法は式で使える行だけ（書きかけの行は入れない。第1.7版。暫定。前の版のアプリでも読めるように）
+ * バックアップの中身：全部の仕事（切り出しチェック・仕上がりの完了・履歴も）。コピーしたセルは入れない。
+ * 調整寸法は第2.2版（仕様書 26.2）でなくしたので、adjusts はいつも空の並び（前の版のアプリでも読めるよう、形は変えない）
  */
-export function backupFile(data: Pick<AppData, 'jobs' | 'adjusts'>): BackupFile {
-  return { app: TRANSFER_APP, kind: 'backup', version: TRANSFER_VERSION, jobs: data.jobs, adjusts: usableAdjusts(data.adjusts) }
+export function backupFile(data: Pick<AppData, 'jobs'>): BackupFile {
+  return { app: TRANSFER_APP, kind: 'backup', version: TRANSFER_VERSION, jobs: data.jobs, adjusts: [] }
 }
 
 /** バックアップのファイルの中身（JSON の文字列。空白なし） */
-export function buildBackupFile(data: Pick<AppData, 'jobs' | 'adjusts'>): string {
+export function buildBackupFile(data: Pick<AppData, 'jobs'>): string {
   return JSON.stringify(backupFile(data))
 }
 

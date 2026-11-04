@@ -19,16 +19,17 @@ export interface JobFile {
   kind: 'job'
   version: typeof TRANSFER_VERSION
   job: Job
-  /** その仕事の式で使っている調整寸法だけ */
+  /** 前の版：その仕事の式で使っている調整寸法（読むときは式の置き換えに使う）。第2.2版で書くときはいつも空の並び */
   adjusts: Adjust[]
 }
 
-/** バックアップのファイル（全部の仕事と調整寸法の一覧。チェック・履歴も含めてそのまま。第2.0版までのファイルは履歴が無い） */
+/** バックアップのファイル（全部の仕事。チェック・履歴も含めてそのまま。第2.0版までのファイルは履歴が無い） */
 export interface BackupFile {
   app: typeof TRANSFER_APP
   kind: 'backup'
   version: typeof TRANSFER_VERSION
   jobs: Job[]
+  /** 前の版：調整寸法の一覧（読むときは式の置き換えに使う）。第2.2版で書くときはいつも空の並び */
   adjusts: Adjust[]
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
+import { shelfJob } from '../engine/fixtures/shelf'
 import { buildBackupFile } from '../engine/transfer/backup'
 import { readTransferFile } from '../engine/transfer/read'
 import { buildJobFile } from '../engine/transfer/share'
@@ -14,7 +14,7 @@ function read(text: string) {
 describe('取り込みの確認の文言', () => {
   it('共有：「共有された仕事：本棚（部材 4件）」と「取り込む」', () => {
     const job = { ...shelfJob(), name: '本棚' }
-    const s = importSummary(read(buildJobFile(job, shelfAdjusts())))
+    const s = importSummary(read(buildJobFile(job)))
     expect(s.title).toBe(`共有された仕事：本棚（部材 ${job.parts.length}件）`)
     expect(s.names).toEqual([])
     expect(s.action).toBe('取り込む')
@@ -22,7 +22,7 @@ describe('取り込みの確認の文言', () => {
 
   it('バックアップ：仕事の数と名前、「追加する」。11件目からは「ほか」', () => {
     const jobs = Array.from({ length: 12 }, (_, i) => ({ ...shelfJob(), id: `j${i}`, name: i === 0 ? '' : `棚${i}` }))
-    const s = importSummary(read(buildBackupFile({ jobs, adjusts: shelfAdjusts() })))
+    const s = importSummary(read(buildBackupFile({ jobs })))
     expect(s.title).toBe('バックアップ：仕事 12件')
     expect(s.names).toHaveLength(10)
     expect(s.names[0]).toBe('（名前なし）')

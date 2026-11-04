@@ -116,7 +116,7 @@ export function JobsScreen({ onOpened }: { onOpened: () => void }) {
   /** この仕事を送る。共有シートを開けるよう、ファイルは押した操作の中で同期に作る */
   const send = (job: Job) => {
     reset()
-    const file = jsonFile(buildJobFile(job, data.adjusts), jobFileName(job))
+    const file = jsonFile(buildJobFile(job), jobFileName(job))
     if (!file) {
       setTransferMsg({ ok: false, text: MAKE_FAILED, jobId: job.id })
       return

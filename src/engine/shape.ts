@@ -1,6 +1,7 @@
 // 保存データ・共有とバックアップのファイルの中身の形の確かめ（store/storage.ts から移した。第1.1版 E-11）。
 // 手で書き換えたデータや途中までのデータで画面が真っ白にならないよう、形が違えば「読めない」とする
-import { ADJUST_COLS, CELL_COLS, type Adjust, type AdjustClip, type AdjustRow, type CellClip, type CellCut, type CellRange, type FrozenSheet, type HistoryEntry, type HistoryPart, type Job, type Part, type Settings, type Sheet } from './types'
+import type { LegacyAdjust } from './migrate/numbers'
+import { CELL_COLS, type Adjust, type CellClip, type CellCut, type CellRange, type FrozenSheet, type HistoryEntry, type HistoryPart, type Job, type Part, type Settings, type Sheet } from './types'
 
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -164,53 +165,26 @@ export function readJobs(v: unknown): Job[] | null {
   return out
 }
 
+/** 前の版の調整寸法（送るファイル・バックアップの adjusts の1つ。名前と 0 より大きい寸法） */
 export function isAdjust(v: unknown): v is Adjust {
   return isRecord(v) && isString(v.id) && isString(v.name) && isPositive(v.value)
 }
 
 /**
- * 調整寸法の表の行（第1.7版）：名前は文字（空も可）、寸法は 0 より大きい数か空（null）。
+ * 前の版の調整寸法の表の行（第1.7版）：名前は文字（空も可）、寸法は 0 より大きい数か空（null）。
  * 第1.6版までの調整寸法（Adjust）もそのまま読める
  */
-export function isAdjustRow(v: unknown): v is AdjustRow {
+function isLegacyAdjustRow(v: unknown): v is LegacyAdjust {
   return isRecord(v) && isString(v.id) && isString(v.name) && (v.value === null || isPositive(v.value))
 }
 
 /**
- * 保存データの調整寸法の表を読む（第1.7版）。形が違う行が1つでもあれば null（仕事と同じく、読めないとする）。
- * 同じ id の行が2つあれば null。名前も寸法も空の行は外す
+ * 前の保存データの調整寸法の表（AppData.adjusts。第2.1版まで）を、式を数字に置き換えるために読む（第2.2版。仕様書 26.4）。
+ * 無ければ（第2.2版の保存データ）空。あって形が違う行が1つでもあれば・同じ id の行が2つあれば null（前の版と同じく、読めないとする）
  */
-export function readAdjustRows(v: unknown): AdjustRow[] | null {
-  if (!Array.isArray(v) || !v.every(isAdjustRow)) return null
+export function readLegacyAdjusts(v: unknown): LegacyAdjust[] | null {
+  if (v === undefined) return []
+  if (!Array.isArray(v) || !v.every(isLegacyAdjustRow)) return null
   if (new Set(v.map((r) => r.id)).size !== v.length) return null
-  return v.filter((r) => r.name.trim() !== '' || r.value !== null)
-}
-
-/** 調整寸法の表の四角い範囲：整数で、行は 0 から・列は表（名前・寸法）の中、1行×1列以上 */
-function isAdjustRange(v: unknown): v is CellRange {
-  if (!isRecord(v) || ![v.top, v.left, v.rows, v.cols].every((n) => Number.isInteger(n))) return false
-  const { top, left, rows, cols } = v as unknown as CellRange
-  return top >= 0 && left >= 0 && rows >= 1 && cols >= 1 && left + cols <= ADJUST_COLS.length
-}
-
-/** 調整寸法の表でコピーしたセル（第1.7版）：1〜2列の四角い形で、中身は全部文字。cut は無くてもよい */
-export function isAdjustClip(v: unknown): v is AdjustClip {
-  if (!isRecord(v) || !Number.isInteger(v.rows) || !Number.isInteger(v.cols)) return false
-  const rows = v.rows as number
-  const cols = v.cols as number
-  if (rows < 1 || cols < 1 || cols > ADJUST_COLS.length) return false
-  if (v.cut !== undefined && !(isAdjustRange(v.cut) && v.cut.rows === rows && v.cut.cols === cols)) return false
-  return (
-    Array.isArray(v.cells) &&
-    v.cells.length === rows &&
-    v.cells.every((r) => Array.isArray(r) && r.length === cols && r.every(isString))
-  )
-}
-
-/** 保存データの調整寸法の表のクリップを読む。無い（第1.6版まで）・形が違えば null。切り取りの元だけ違えば外して読む（暫定） */
-export function readAdjustClip(v: unknown): AdjustClip | null {
-  if (isAdjustClip(v)) return v
-  if (!isRecord(v) || v.cut === undefined) return null
-  const { cut: _cut, ...rest } = v
-  return isAdjustClip(rest) ? rest : null
+  return v
 }

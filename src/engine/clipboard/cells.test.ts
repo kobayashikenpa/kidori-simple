@@ -144,103 +144,34 @@ describe('pasteCells：1つのセルをコピーしたとき', () => {
     }
   })
 
-  it('仕様書 18.3：「棚板」をコピーして2つのセルに貼ると「棚板1」「棚板2」。コピー元の「棚板」はそのまま', () => {
+  it('第2.2版（仕様書 26.3）：「棚板」をコピーして2つのセルに貼ると、どちらも「棚板」（番号を振らない）', () => {
     const job = jobOf(part('a', '棚板'), part('b', 'B'), part('c', 'C'))
     const clip = okCopy(copyCells(job, [c(0, 'name')]))
     const r = okPaste(pasteCells(job, clip, [c(1, 'name'), c(2, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板', '棚板1', '棚板2'])
+    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板', '棚板', '棚板'])
     expect(r.pasted).toBe(2)
     expect(r.skipped).toEqual([])
-    expect(r.renamed).toEqual([
-      { cell: c(1, 'name'), from: '棚板', to: '棚板1' },
-      { cell: c(2, 'name'), from: '棚板', to: '棚板2' },
-    ])
+    expect('renamed' in r).toBe(false)
   })
 
-  it('「棚板1」がもうあれば「棚板2」から。間が空いていれば一番小さい番号（棚板1・棚板3 があれば 棚板2・棚板4）', () => {
-    const job = jobOf(part('a', '棚板'), part('b', '棚板1'), part('c', 'C'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), [c(2, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板', '棚板1', '棚板2'])
-    const job2 = jobOf(part('a', '棚板'), part('b', '棚板1'), part('c', '棚板3'))
-    const r2 = okPaste(pasteCells(job2, clipOf([['棚板']]), [c(3, 'name'), c(4, 'name')], ids()))
-    expect(r2.job.parts.map((p) => p.name)).toEqual(['棚板', '棚板1', '棚板3', '棚板2', '棚板4'])
+  it('今ある部材と同じ名前（全角・半角の違いも）も、そのまま貼る。終わりが数字の名前もそのまま', () => {
+    const job = jobOf(part('a', '棚板１'), part('b', 'B'), part('c', 'C'))
+    const r = okPaste(pasteCells(job, clipOf([['棚板1'], ['棚板１']]), [c(1, 'name')], ids()))
+    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板１', '棚板1', '棚板１'])
   })
 
-  it('番号の重なりも全角・半角の違いを同じとみなす（「棚板１」があれば「棚板2」）', () => {
-    const job = jobOf(part('a', '棚板'), part('b', '棚板１'), part('c', 'C'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), [c(2, 'name')], ids()))
-    expect(r.job.parts[2].name).toBe('棚板2')
-  })
-
-  it('名前を複数の名前の欄に貼ると、今の部材と重ならなくても貼るものどうしが重なるので全部に番号を振る', () => {
-    const job = jobOf(part('a', 'A'), part('b', 'B'), part('c', 'C'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), [c(0, 'name'), c(1, 'name'), c(2, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板1', '棚板2', '棚板3'])
-    expect(r.pasted).toBe(3)
-    expect(r.skipped).toEqual([])
-  })
-
-  it('コピー元のセルも貼る先に入っていたら、コピー元は今の名前のまま、ほかに番号を振る', () => {
-    const job = jobOf(part('a', '棚板'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), [c(0, 'name'), c(1, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板', '棚板1'])
-    expect(r.renamed).toEqual([{ cell: c(1, 'name'), from: '棚板', to: '棚板1' }])
-  })
-
-  it('仕様書 18.3：コピーした名前の終わりが数字なら、その数字を外した名前に番号を振る（「棚板1」→「棚板2」。「棚板11」にしない）', () => {
-    const job = jobOf(part('a', '棚板1'), part('b', 'B'), part('c', 'C'))
-    const clip = okCopy(copyCells(job, [c(0, 'name')]))
-    const r = okPaste(pasteCells(job, clip, [c(1, 'name'), c(2, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板1', '棚板2', '棚板3'])
-    expect(r.renamed).toEqual([
-      { cell: c(1, 'name'), from: '棚板1', to: '棚板2' },
-      { cell: c(2, 'name'), from: '棚板1', to: '棚板3' },
-    ])
-  })
-
-  it('終わりの数字が全角でも、複数桁でも外して振る（「棚板１２」→ 棚板 に番号）', () => {
-    const job = jobOf(part('a', '棚板１２'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板１２']]), [c(1, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板１２', '棚板1'])
-  })
-
-  it('数字だけの名前は、数字を外すと空になるので、そのまま後ろに番号を振る（「12」→「121」）', () => {
-    const job = jobOf(part('a', '12'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['12']]), [c(1, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['12', '121'])
-  })
-
-  it('終わりが数字でも、重ならなければ番号を振らずにそのまま貼る', () => {
+  it('名前の前後の空白は外す。空の名前はいくつでも貼れる', () => {
     const job = jobOf(part('a', 'A'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板5']]), [c(1, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['A', '棚板5'])
-    expect(r.renamed).toEqual([])
+    expect(okPaste(pasteCells(job, clipOf([[' 扉 ']]), [c(0, 'name')], ids())).job.parts[0].name).toBe('扉')
+    expect(okPaste(pasteCells(job, clipOf([['']]), [c(0, 'name'), c(1, 'name')], ids())).job.parts.map((p) => p.name)).toEqual(['', ''])
   })
 
-  it('今の部材と重ならない名前は、番号を振らずにそのまま貼る（ほかの仕事からのコピーなど）', () => {
-    const job = jobOf(part('a', 'A'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), [c(1, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['A', '棚板'])
-    expect(r.renamed).toEqual([])
-  })
-
-  it('今ある部材と同じ名前（全角・半角の違いも）には番号を振る。空の名前はいくつでも貼れる', () => {
-    const job = jobOf(part('a', '棚板1'), part('b', 'B'), part('c', 'C'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板１']]), [c(1, 'name')], ids()))
-    expect(r.pasted).toBe(1)
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板1', '棚板2', 'C'])
-    const r2 = okPaste(pasteCells(job, clipOf([['']]), [c(1, 'name'), c(2, 'name')], ids()))
-    expect(r2.job.parts.map((p) => p.name)).toEqual(['棚板1', '', ''])
-    expect(r2.pasted).toBe(2)
-    expect(r2.renamed).toEqual([])
-  })
-
-  it('名前に使えない文字（式の記号）は貼らない', () => {
+  it('式の記号の入った名前も貼れる（第2.2版。式で参照しなくなったため。暫定）', () => {
     const job = shelfJob()
-    const r = okPaste(pasteCells(job, clipOf([['全体.W']]), [c(1, 'name')], ids()))
-    expect(r.pasted).toBe(0)
-    expect(r.skipped[0]).toMatchObject({ cell: c(1, 'name'), reason: 'invalidName' })
-    expect(r.job.parts[1].name).toBe('天板')
+    const r = okPaste(pasteCells(job, clipOf([['棚板(左)']]), [c(1, 'name')], ids()))
+    expect(r.pasted).toBe(1)
+    expect(r.skipped).toEqual([])
+    expect(r.job.parts[1].name).toBe('棚板(左)')
   })
 
   it('枚数の欄：0 以上の整数（全角も）は貼る、空は空にする。式・文字・小数・マイナスは貼らない', () => {
@@ -337,49 +268,21 @@ describe('pasteCells：範囲をコピーしたとき', () => {
     expect(computeDimensions(r.job).parts[1].finished).toEqual({ W: 400, H: 1800 })
   })
 
-  it('同じ名前は番号を振って貼り、枚数に式は貼られず貼れなかったセルが返る（ほかのセルは貼る）', () => {
+  it('同じ名前もそのまま貼り、枚数に名前の文字は貼られず貼れなかったセルが返る（ほかのセルは貼る）', () => {
     const job = shelfJob()
-    // 棚板の行（名前・W・H・枚数）の形で、名前は今ある「天板」、枚数は式
-    const clip = clipOf([['天板', '300', '400', '全体.W']])
+    // 側板の行（名前・W・H・枚数）の形で、名前は今ある「天板」、枚数は文字
+    const clip = clipOf([['天板', '300', '400', '天板']])
     const r = okPaste(pasteCells(job, clip, [c(2, 'name')], ids()))
-    expect(table(r.job)[2]).toEqual(['天板1', '300', '400', 2])
+    expect(table(r.job)[2]).toEqual(['天板', '300', '400', 2])
     expect(r.pasted).toBe(3)
     expect(r.skipped).toEqual([{ cell: c(2, 'qty'), reason: 'notQuantity', message: '枚数には 0 以上の整数だけ貼れます' }])
   })
 
-  it('貼るものどうしで同じ名前（全角・半角の違いも）になるときは、どちらにも番号を振る（書いた文字の後ろに）', () => {
-    const job = jobOf(part('a', 'A'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['X'], ['Ｘ']]), [c(0, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['X1', 'Ｘ2'])
-    expect(r.skipped).toEqual([])
-  })
-
-  it('番号は、重ならずにそのまま貼る名前とも重ならないようにする（「棚板」「棚板1」を貼る → 棚板2・棚板1）', () => {
-    const job = jobOf(part('a', '棚板'), part('b', 'B'), part('c', 'C'))
-    const r = okPaste(pasteCells(job, clipOf([['棚板'], ['棚板1']]), [c(1, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['棚板', '棚板2', '棚板1'])
-  })
-
-  it('名前を入れ替える貼り方（A・B の行に B・A）は、貼ったあとに重ならないので貼れる', () => {
+  it('名前を入れ替える貼り方（A・B の行に B・A）もそのまま', () => {
     const job = jobOf(part('a', 'A'), part('b', 'B'))
     const r = okPaste(pasteCells(job, clipOf([['B'], ['A']]), [c(0, 'name')], ids()))
     expect(r.job.parts.map((p) => p.name)).toEqual(['B', 'A'])
     expect(r.skipped).toEqual([])
-  })
-
-  it('貼れない名前（記号入り）の行は元の名前が残るので、それと重なる名前には番号を振る', () => {
-    // 行0 に「B」を貼り、行1 に「棚+板」（使えない）を貼る → 行1 は B のまま → 行0 は B1
-    const job = jobOf(part('a', 'A'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['B'], ['棚+板']]), [c(0, 'name')], ids()))
-    expect(r.job.parts.map((p) => p.name)).toEqual(['B1', 'B'])
-    expect(r.skipped.map((s) => [s.cell, s.reason])).toEqual([[c(1, 'name'), 'invalidName']])
-  })
-
-  it('番号を振る名前が名前に使えない（記号入り）ときは、今までどおり貼らない', () => {
-    const job = jobOf(part('a', '棚(板'), part('b', 'B'))
-    const r = okPaste(pasteCells(job, clipOf([['棚(板']]), [c(1, 'name')], ids()))
-    expect(r.job).toBe(job)
-    expect(r.skipped.map((s) => s.reason)).toEqual(['invalidName'])
   })
 
   it('貼って行の全部の欄が空になった部材は消す', () => {
@@ -399,8 +302,7 @@ describe('pasteCells：範囲をコピーしたとき', () => {
     expect(r1.pasted + r.pasted).toBe(300)
     expect([...r1.skipped, ...r.skipped]).toHaveLength(0)
     expect(r.job.parts[149].expr.W).toBe('379.5')
-    expect(r.job.parts.slice(0, 3).map((p) => p.name)).toEqual(['棚板1', '棚板2', '棚板3'])
-    expect(r.job.parts[149].name).toBe('棚板150')
+    expect(r.job.parts.every((p) => p.name === '棚板')).toBe(true)
   })
 
   it('元の仕事は書き換えない', () => {

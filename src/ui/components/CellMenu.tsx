@@ -57,7 +57,7 @@ export function CellMenu({ job, range, title, clip, dispatch, onClose, onNotice,
   const paste = () => {
     const r = run({ type: 'pasteCells', range })
     if (!r.ok) return
-    onNotice(r.paste ? pasteText(r.paste.pasted, r.paste.skipped, r.paste.renamed.length) : '貼りました')
+    onNotice(r.paste ? pasteText(r.paste.pasted, r.paste.skipped) : '貼りました')
     onClose()
   }
   const clear = () => {

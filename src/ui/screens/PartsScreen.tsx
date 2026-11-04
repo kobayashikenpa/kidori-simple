@@ -1,11 +1,11 @@
-// 部材の画面（仕様書 5.1・5.2・9・15.1・16・21）：［仕上がり］［木取り］のタブと部材の表。［仕上がり］は部材の表の下に調整寸法の表（AdjustTable。仕様書 21.1）。
+// 部材の画面（仕様書 5.1・5.2・9・15.1・16・26）：［仕上がり］［木取り］のタブと部材の表（第2.2版で調整寸法の表はなくした）。
 // ［木取り］のタブのときだけ、表の上に切り代（数字キーで変える。仕様書 16.4）。
 // ［仕上がり］は入力できる表（押して選ぶ・もう一度押して入力。仕様書 17.1）、［木取り］は同じ形の表を見るだけ。
 // 寸法の計算は engine（computeDimensions）、切り出しの進み具合は engine（partCutProgress）に任せる
-import { usableAdjusts } from '../../engine/adjusts'
 import { useMemo, useState } from 'react'
 import { computeDimensions } from '../../engine/dimensions'
 import { partCutProgress } from '../../engine/progress/partProgress'
+import type { Adjust } from '../../engine/types'
 import { browserStorage } from '../../store/storage'
 import { useJobStore } from '../../store/useJobStore'
 import { CutTable } from '../components/CutTable'
@@ -18,11 +18,13 @@ import { loadPartsTab, PARTS_TABS, savePartsTab, type PartsTab } from '../partsT
 
 const ROTATION_TEXT = { all: 'オン', some: '一部', none: 'オフ' } as const
 
+/** 第2.2版（仕様書 26.2）で調整寸法はなくしたので、式の表示（U-27 でなくす）には空の一覧を渡す */
+const NO_ADJUSTS: readonly Adjust[] = []
+
 export function PartsScreen() {
   const { job, data, dispatch } = useJobStore()
   const [tab, setTabState] = useState<PartsTab>(() => loadPartsTab(browserStorage()))
   const [error, setError] = useState<string | null>(null)
-  const adjusts = usableAdjusts(data.adjusts)
   const dims = useMemo(() => (job ? computeDimensions(job) : null), [job])
   const progress = useMemo(() => (job ? partCutProgress(job) : []), [job])
   if (!job || !dims) return null
@@ -100,7 +102,7 @@ export function PartsScreen() {
               <span className="rot-text">{ROTATION_TEXT[rotation]}</span>
             </button>
           </div>
-          <PartsTable job={job} dims={dims} adjusts={adjusts} clip={data.cellClip} dispatch={dispatch} onError={setError} />
+          <PartsTable job={job} dims={dims} adjusts={NO_ADJUSTS} clip={data.cellClip} dispatch={dispatch} onError={setError} />
         </>
       ) : (
         <>
@@ -110,7 +112,7 @@ export function PartsScreen() {
             </Help>
             <NumberField label="切り代" value={job.settings.allowance} onCommit={commitAllowance} onError={setError} />
           </div>
-          <CutTable job={job} dims={dims} adjusts={adjusts} progress={progress} />
+          <CutTable job={job} dims={dims} adjusts={NO_ADJUSTS} progress={progress} />
         </>
       )}
       {error && (

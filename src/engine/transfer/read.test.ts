@@ -11,7 +11,7 @@ const failed = { ok: false, message: '読み込めませんでした' }
 
 describe('readTransferFile：読めるファイル', () => {
   it('仕事1つのファイル：種類 job と、確認に出す仕事の名前・部材の数', () => {
-    const r = readTransferFile(buildJobFile(shelfJob(), shelfAdjusts()))
+    const r = readTransferFile(buildJobFile(shelfJob()))
     expect(r.ok).toBe(true)
     if (!r.ok || r.kind !== 'job') throw new Error('読めない')
     expect(r.summary).toEqual({ jobName: '棚', partCount: 4 })
@@ -21,27 +21,27 @@ describe('readTransferFile：読めるファイル', () => {
   })
 
   it('バックアップ：種類 backup と、確認に出す仕事の数・名前', () => {
-    const r = readTransferFile(buildBackupFile({ jobs: [shelfJob('a', '本棚'), shelfJob('b', '食器棚')], adjusts: shelfAdjusts() }))
+    const r = readTransferFile(buildBackupFile({ jobs: [shelfJob('a', '本棚'), shelfJob('b', '食器棚')] }))
     expect(r.ok).toBe(true)
     if (!r.ok || r.kind !== 'backup') throw new Error('読めない')
     expect(r.summary).toEqual({ jobCount: 2, jobNames: ['本棚', '食器棚'] })
-    expect(r.file.adjusts).toHaveLength(2)
+    expect(r.file.adjusts).toEqual([])
   })
 
   it('名前が空・枚数が空の部材があっても読める', () => {
     const job = shelfJob()
     job.parts.push({ id: 'p5', name: '', expr: { W: '300', H: '400' }, quantity: null, rotatable: false, finishedDone: false })
-    const r = readTransferFile(buildJobFile(job, shelfAdjusts()))
+    const r = readTransferFile(buildJobFile(job))
     expect(r.ok && r.kind === 'job' && r.summary.partCount).toBe(5)
   })
 
   it('第1.3版までの切り方「おまかせ」（auto）の仕事・バックアップは、縦切り優先にして読む（仕様書 18.2）', () => {
     const auto = (j: ReturnType<typeof shelfJob>) => JSON.parse(JSON.stringify(j).replace('"cutMode":"vertical"', '"cutMode":"auto"'))
-    const one = readTransferFile(buildJobFile(auto(shelfJob()), shelfAdjusts()))
+    const one = readTransferFile(buildJobFile(auto(shelfJob())))
     expect(one.ok && one.kind === 'job' && one.file.job.settings.cutMode).toBe('vertical')
     const h = shelfJob('b', '食器棚')
     h.settings.cutMode = 'horizontal'
-    const backup = readTransferFile(buildBackupFile({ jobs: [auto(shelfJob('a', '本棚')), h], adjusts: shelfAdjusts() }))
+    const backup = readTransferFile(buildBackupFile({ jobs: [auto(shelfJob('a', '本棚')), h] }))
     expect(backup.ok && backup.kind === 'backup' && backup.file.jobs.map((j) => j.settings.cutMode)).toEqual(['vertical', 'horizontal'])
   })
 
@@ -51,9 +51,9 @@ describe('readTransferFile：読めるファイル', () => {
       for (const j of d.kind === 'job' ? [d.job] : d.jobs) delete j.history
       return JSON.stringify(d)
     }
-    const one = readTransferFile(noHistory(buildJobFile(shelfJob(), shelfAdjusts())))
+    const one = readTransferFile(noHistory(buildJobFile(shelfJob())))
     expect(one.ok && one.kind === 'job' && one.file.job.history).toEqual([])
-    const old = noHistory(buildBackupFile({ jobs: [withHistory(shelfJob('a', '本棚'), 'h-1'), shelfJob('b', '食器棚')], adjusts: shelfAdjusts() }))
+    const old = noHistory(buildBackupFile({ jobs: [withHistory(shelfJob('a', '本棚'), 'h-1'), shelfJob('b', '食器棚')] }))
     expect(old).not.toContain('"history"')
     const backup = readTransferFile(old)
     expect(backup.ok && backup.kind === 'backup' && backup.file.jobs.map((j) => j.history)).toEqual([[], []])
@@ -61,27 +61,35 @@ describe('readTransferFile：読めるファイル', () => {
 
   it('履歴の入ったバックアップを読める', () => {
     const job = withHistory(shelfJob('a', '本棚'), 'h-1', '初めの案')
-    const r = readTransferFile(buildBackupFile({ jobs: [job], adjusts: shelfAdjusts() }))
+    const r = readTransferFile(buildBackupFile({ jobs: [job] }))
     expect(r.ok && r.kind === 'backup' && r.file.jobs[0].history).toEqual(job.history)
   })
 
   it('分ける前のアプリ（キドリライト：app kidori-lite）の送るファイル・バックアップも読める', () => {
-    const job = JSON.parse(buildJobFile(shelfJob(), shelfAdjusts()))
-    const r = readTransferFile(JSON.stringify({ ...job, app: 'kidori-lite' }))
+    const job = JSON.parse(buildJobFile(shelfJob()))
+    const r = readTransferFile(JSON.stringify({ ...job, app: 'kidori-lite', adjusts: shelfAdjusts() }))
     expect(r.ok && r.kind === 'job' && r.file.app).toBe('kidori-simple')
-    const backup = JSON.parse(buildBackupFile({ jobs: [shelfJob()], adjusts: shelfAdjusts() }))
+    expect(r.ok && r.file.adjusts).toEqual(shelfAdjusts())
+    const backup = JSON.parse(buildBackupFile({ jobs: [shelfJob()] }))
     const b = readTransferFile(JSON.stringify({ ...backup, app: 'kidori-lite' }))
     expect(b.ok && b.kind === 'backup' && b.file.jobs.length).toBe(1)
   })
 
+  it('前の版のファイルの調整寸法の一覧（式の置き換えに使う）も読める', () => {
+    const old = JSON.parse(buildJobFile(shelfJob()))
+    old.adjusts = shelfAdjusts()
+    const r = readTransferFile(JSON.stringify(old))
+    expect(r.ok && r.file.adjusts).toEqual(shelfAdjusts())
+  })
+
   it('先頭に BOM があっても読める', () => {
-    expect(readTransferFile(`﻿${buildJobFile(shelfJob(), shelfAdjusts())}`).ok).toBe(true)
+    expect(readTransferFile(`﻿${buildJobFile(shelfJob())}`).ok).toBe(true)
   })
 })
 
 describe('readTransferFile：読めないファイルは「読み込めませんでした」', () => {
-  const job = () => JSON.parse(buildJobFile(shelfJob(), shelfAdjusts()))
-  const backup = () => JSON.parse(buildBackupFile({ jobs: [shelfJob()], adjusts: shelfAdjusts() }))
+  const job = () => JSON.parse(buildJobFile(shelfJob()))
+  const backup = () => JSON.parse(buildBackupFile({ jobs: [shelfJob()] }))
 
   it('文言', () => {
     expect(READ_FAILED).toBe('読み込めませんでした')
@@ -91,7 +99,7 @@ describe('readTransferFile：読めないファイルは「読み込めません
     ['空', ''],
     ['空白だけ', '   '],
     ['JSON でない', '{こわれた'],
-    ['途中で切れた', buildJobFile(shelfJob(), shelfAdjusts()).slice(0, 100)],
+    ['途中で切れた', buildJobFile(shelfJob()).slice(0, 100)],
     ['null', 'null'],
     ['配列', '[]'],
     ['文字', '"kidori-simple"'],

@@ -1,26 +1,13 @@
-import { usableAdjusts } from './adjusts'
 import { describe, expect, it } from 'vitest'
 import {
   adjustName,
-  adjustNameKey,
   createJob,
-  defaultAdjusts,
   defaultAppData,
   defaultSettings,
   customSheet,
   defaultSheet,
   normalizeSheet,
 } from './defaults'
-
-function idMaker() {
-  let n = 0
-  const prefixes: string[] = []
-  const newId = (prefix: string) => {
-    prefixes.push(prefix)
-    return `${prefix}-${++n}`
-  }
-  return { newId, prefixes }
-}
 
 describe('defaultSheet（新しい仕事の板）', () => {
   it('4×8（1220×2430）', () => {
@@ -48,25 +35,7 @@ describe('defaultSettings（新しい仕事の設定）', () => {
   })
 })
 
-describe('defaultAdjusts（初めて開いたときの調整寸法）', () => {
-  it('メラミン1・シート0.5 の2つ', () => {
-    const { newId } = idMaker()
-    const a = defaultAdjusts(newId)
-    expect(a.map((x) => [x.name, x.value])).toEqual([
-      ['メラミン', 1],
-      ['シート', 0.5],
-    ])
-    expect(a.map(adjustName)).toEqual(['メラミン1', 'シート0.5'])
-  })
-  it('id は newId("adjust") で作り、別々', () => {
-    const { newId, prefixes } = idMaker()
-    const a = defaultAdjusts(newId)
-    expect(prefixes).toEqual(['adjust', 'adjust'])
-    expect(new Set(a.map((x) => x.id)).size).toBe(2)
-  })
-})
-
-describe('adjustName（調整寸法の表示名＝名前＋寸法）', () => {
+describe('adjustName（前の版の調整寸法の表示名＝名前＋寸法。式の表示・置き換えのエラーの文で使う）', () => {
   const g = (value: number) => adjustName({ name: '逃げ', value })
   it('mm を付けず、寸法は丸めない（浮動小数の誤差だけ消す）。末尾の .0 は付けない', () => {
     expect(g(1)).toBe('逃げ1')
@@ -77,25 +46,6 @@ describe('adjustName（調整寸法の表示名＝名前＋寸法）', () => {
   })
   it('名前は登録した名前（ほぞ15）', () => {
     expect(adjustName({ name: 'ほぞ', value: 15 })).toBe('ほぞ15')
-  })
-})
-
-describe('adjustNameKey（表示名が重なるかの判定）', () => {
-  it('名前「逃げ1」寸法5 と 名前「逃げ」寸法15 は、どちらも「逃げ15」で重なる', () => {
-    expect(adjustNameKey({ name: '逃げ1', value: 5 })).toBe(adjustNameKey({ name: '逃げ', value: 15 }))
-  })
-  it('同じ名前でも寸法が違えば別（逃げ0.5 と 逃げ1）', () => {
-    expect(adjustNameKey({ name: '逃げ', value: 0.5 })).not.toBe(adjustNameKey({ name: '逃げ', value: 1 }))
-  })
-  it('同じ寸法でも名前が違えば別（逃げ1 と メラミン1）', () => {
-    expect(adjustNameKey({ name: '逃げ', value: 1 })).not.toBe(adjustNameKey({ name: 'メラミン', value: 1 }))
-  })
-  it('全角・半角の違いと前後の空白は同じとみなす（ほぞ１５ と ほぞ15）', () => {
-    expect(adjustNameKey({ name: ' ほぞ１ ', value: 5 })).toBe(adjustNameKey({ name: 'ほぞ', value: 15 }))
-    expect(adjustNameKey({ name: 'ＭＤＦ', value: 1 })).toBe(adjustNameKey({ name: 'MDF', value: 1 }))
-  })
-  it('浮動小数の誤差は同じとみなす（0.1 + 0.2 と 0.3）', () => {
-    expect(adjustNameKey({ name: '逃げ', value: 0.1 + 0.2 })).toBe(adjustNameKey({ name: '逃げ', value: 0.3 }))
   })
 })
 
@@ -123,13 +73,8 @@ describe('createJob（新しい仕事）', () => {
 })
 
 describe('defaultAppData（初めて開いたときの保存データ）', () => {
-  it('仕事なし・調整寸法は メラミン1・シート0.5・コピーした部材なし', () => {
-    const { newId } = idMaker()
-    const d = defaultAppData(newId)
-    expect(d.version).toBe(1)
-    expect(d.jobs).toEqual([])
-    expect(usableAdjusts(d.adjusts).map(adjustName)).toEqual(['メラミン1', 'シート0.5'])
-    expect(d.cellClip).toBeNull()
+  it('仕事なし・コピーしたセルなし（第2.2版から調整寸法の一覧は無い）', () => {
+    expect(defaultAppData()).toEqual({ version: 1, jobs: [], cellClip: null })
   })
 })
 

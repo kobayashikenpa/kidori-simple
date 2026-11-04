@@ -1,6 +1,5 @@
 // 部材の表示用の名前と、名前・枚数が空の部材の扱い（第1.1版。仕様書 15.1）
 // - 名前は空でもよい。空の部材は画面で「#3」（job.parts の並びで 1 から数えた行番号）と出す
-// - 名前の無い部材は式から参照できない（第1.6版：表のセルを押しても式に入れない）
 // - 枚数が空（quantity: null）の部材は、寸法は計算するが木取り・必要な枚数・進み具合・比べに入れない
 import type { Job, Part } from './types'
 
@@ -23,11 +22,6 @@ export function partLabels(parts: readonly Pick<Part, 'id' | 'name'>[]): Map<str
 export function partLabel(job: Pick<Job, 'parts'>, partId: string): string {
   const i = job.parts.findIndex((p) => p.id === partId)
   return i < 0 ? '' : partLabelAt(job.parts[i], i)
-}
-
-/** 式から参照できる部材（名前のある部材。並びはそのまま） */
-export function referableParts<T extends Pick<Part, 'name'>>(parts: readonly T[]): T[] {
-  return parts.filter(hasName)
 }
 
 /** 切り出す枚数。枚数が空（null）と 0（寸法だけの行）は 0 */

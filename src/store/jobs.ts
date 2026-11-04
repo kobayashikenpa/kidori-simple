@@ -1,19 +1,13 @@
-// 仕事・部材・設定・調整寸法の操作（純粋関数）。元のデータは書き換えず、新しいデータを返す。
+// 仕事・部材・設定の操作（純粋関数）。元のデータは書き換えず、新しいデータを返す。
 // kidori の store/jobs.ts を参考に作り直したもの（材料・フラッシュ・重ね切り・手持ちは無い）。
 // updatedAt は reducer の側で付ける
-import { adjustConflict, duplicateAdjustMessage } from '../engine/adjusts'
 import { createJob, normalizeSheet } from '../engine/defaults'
 import { copyHistory } from '../engine/history'
-import { renamePart } from '../engine/formula/rename'
-import { validatePartName } from '../engine/formula/tokenize'
 import { moveParts, sameOrder, sortParts, type SortKey, type SortOrder } from '../engine/order'
-import { BOARD_SIZES, type AdjustRow, type CutMode, type DimensionResult, type Job, type Part, type Settings, type Sheet } from '../engine/types'
+import { BOARD_SIZES, type CutMode, type DimensionResult, type Job, type Part, type Settings, type Sheet } from '../engine/types'
 
 /** 仕事への操作の結果。失敗したときは画面にそのまま出せる日本語の理由 */
 export type OpResult = { ok: true; job: Job } | { ok: false; message: string }
-
-/** 調整寸法の一覧への操作の結果 */
-export type AdjustsResult = { ok: true; adjusts: AdjustRow[] } | { ok: false; message: string }
 
 const ok = (job: Job): OpResult => ({ ok: true, job })
 const fail = (message: string): { ok: false; message: string } => ({ ok: false, message })
@@ -51,7 +45,7 @@ export function copyJobName(name: string): string {
 }
 
 /**
- * 仕事をコピーする。設定はそのまま引き継ぐ（仕様書 4）。部材は式のまま写し、id は新しくする。
+ * 仕事をコピーする。設定はそのまま引き継ぐ（仕様書 4）。部材はそのまま写し、id は新しくする。
  * 切った記録（固定した1枚）と仕上がりの完了のチェックは写さない（暫定。kidori と同じく切った記録は写さない）。
  * 履歴はそのまま写す（第2.1版。仕様書 25.1。履歴の中の仕上がりのチェックも写しのまま）。
  * 元の仕事は書き換えない
@@ -130,21 +124,18 @@ function validatePartFields(part: Part): string | null {
   return null
 }
 
-/** 部材を最後に足す。使えない名前・同じ名前（全角・半角の違いを含む）の部材があれば断る。名前が空の部材はいくつでも足せる */
+/**
+ * 部材を最後に足す。名前の前後の空白は外す。
+ * 第2.2版（仕様書 26.3）から同じ名前の部材も足せる。名前に使える文字の決まりも無い（式で参照しなくなったため。暫定）
+ */
 export function addPart(job: Job, part: Part): OpResult {
   return insertPart(job, job.parts.length, part)
 }
 
-/** 部材を index の位置（今その位置にある部材の上）に入れる。index が範囲外なら最後。断る決まりは addPart と同じ */
+/** 部材を index の位置（今その位置にある部材の上）に入れる。index が範囲外なら最後。同じ id の部材があれば断る */
 export function insertPart(job: Job, index: number, part: Part): OpResult {
-  const name = part.name.trim()
   if (job.parts.some((p) => p.id === part.id)) return fail('同じ id の部材があります')
-  const invalid = validatePartName(
-    name,
-    job.parts.map((p) => p.name),
-  )
-  if (invalid) return fail(invalid)
-  const p: Part = { ...part, name, expr: { W: part.expr.W, H: part.expr.H } }
+  const p: Part = { ...part, name: part.name.trim(), expr: { W: part.expr.W, H: part.expr.H } }
   const err = validatePartFields(p)
   if (err) return fail(err)
   const i = Number.isInteger(index) && index >= 0 && index <= job.parts.length ? index : job.parts.length
@@ -152,8 +143,8 @@ export function insertPart(job: Job, index: number, part: Part): OpResult {
 }
 
 /**
- * 部材を変える。名前を変えたときは、ほかの部材の式の参照（旧名.W など）も新しい名前につけ替える（formula/rename）。
- * 使えない名前・同じ名前の部材があれば断る
+ * 部材を変える（名前の前後の空白は外す）。第2.2版（仕様書 26.3）から同じ名前にもでき、
+ * 名前を変えてもほかの部材は変わらない（式の参照のつけ替えはなくした）
  */
 export function updatePart(job: Job, partId: string, patch: Partial<Omit<Part, 'id'>>): OpResult {
   const cur = job.parts.find((p) => p.id === partId)
@@ -167,12 +158,7 @@ export function updatePart(job: Job, partId: string, patch: Partial<Omit<Part, '
   }
   const err = validatePartFields(next)
   if (err) return fail(err)
-  // 先に中身を入れ替え、そのあと名前を変える（式の参照のつけ替えは新しい式にも効く）
-  const replaced = job.parts.map((p) => (p.id === partId ? { ...next, name: cur.name } : p))
-  if (next.name === cur.name) return ok({ ...job, parts: replaced })
-  const renamed = renamePart(replaced, partId, next.name)
-  if (!renamed.ok) return fail(renamed.message)
-  return ok({ ...job, parts: renamed.parts })
+  return ok({ ...job, parts: job.parts.map((p) => (p.id === partId ? next : p)) })
 }
 
 /** 部材を消す */
@@ -203,55 +189,4 @@ export function sortJobParts(job: Job, dims: DimensionResult, key: SortKey, orde
 export function moveJobParts(job: Job, from: number, count: number, to: number): OpResult {
   const parts = moveParts(job.parts, from, count, to)
   return ok(sameOrder(parts, job.parts) ? job : { ...job, parts })
-}
-
-// ---------- 調整寸法（アプリ全体で1つの一覧） ----------
-
-/** 調整寸法の名前と寸法 */
-export interface AdjustDraft {
-  name: string
-  value: number
-}
-
-/** 足せる・変えられる調整寸法か。よければ null、だめなら理由。exceptId は変える調整寸法自身（重なりの判定から外す） */
-export function validateAdjust(adjusts: readonly AdjustRow[], draft: AdjustDraft, exceptId?: string): string | null {
-  const name = draft.name.trim()
-  if (!name) return '名前を入れてください'
-  if (!(Number.isFinite(draft.value) && draft.value > 0)) return '寸法は 0 より大きい数を入れてください'
-  // 書きかけの行（第1.7版）とは重ならない
-  const same = adjustConflict(adjusts, { name, value: draft.value }, exceptId)
-  if (same) return duplicateAdjustMessage(same)
-  return null
-}
-
-/** 調整寸法を一覧の最後に足す。名前が空・寸法が 0 以下・表示名が重なるものは断る */
-export function addAdjust(adjusts: readonly AdjustRow[], draft: AdjustDraft, id: string): AdjustsResult {
-  const err = validateAdjust(adjusts, draft)
-  if (err) return fail(err)
-  if (adjusts.some((a) => a.id === id)) return fail('同じ id の調整寸法があります')
-  return { ok: true, adjusts: [...adjusts, { id, name: draft.name.trim(), value: draft.value }] }
-}
-
-/**
- * 調整寸法の名前・寸法を変える。式は id（{n:id}）で参照しているので、使っている式の表示と値もついてくる。
- * 使っている仕事の確認は画面で先に行う（formula/usages.ts の adjustUsages）
- */
-export function updateAdjust(adjusts: readonly AdjustRow[], adjustId: string, draft: AdjustDraft): AdjustsResult {
-  if (!adjusts.some((a) => a.id === adjustId)) return fail('調整寸法が見つかりません')
-  const err = validateAdjust(adjusts, draft, adjustId)
-  if (err) return fail(err)
-  return {
-    ok: true,
-    adjusts: adjusts.map((a) => (a.id === adjustId ? { id: a.id, name: draft.name.trim(), value: draft.value } : a)),
-  }
-}
-
-/**
- * 調整寸法を消す（1つでもいくつでも）。使っている式はそのまま残り、式のエラー（削除した調整寸法）になる。
- * 使っている仕事と部材の確認は画面で先に行う（adjustUsagesOf）
- */
-export function removeAdjusts(adjusts: readonly AdjustRow[], adjustIds: readonly string[]): AdjustsResult {
-  const ids = new Set(adjustIds)
-  if (!adjusts.some((a) => ids.has(a.id))) return fail('調整寸法が見つかりません')
-  return { ok: true, adjusts: adjusts.filter((a) => !ids.has(a.id)) }
 }

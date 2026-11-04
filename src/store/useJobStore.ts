@@ -5,7 +5,7 @@ import type { ReduceResult, StoreAction, StoreState } from './reducer'
 
 export interface JobStoreValue {
   state: StoreState
-  /** 保存データ（仕事・調整寸法・コピーしたセル） */
+  /** 保存データ（仕事・コピーしたセル） */
   data: AppData
   /** 開いている仕事（無ければ null） */
   job: Job | null

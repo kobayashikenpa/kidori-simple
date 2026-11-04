@@ -137,53 +137,15 @@ export interface HistoryEntry {
   yieldRate: number
 }
 
-/** 保存する全体 */
+/**
+ * 保存する全体。第2.2版（仕様書 26.2）で調整寸法の一覧（adjusts）と調整寸法の表のコピー（adjustClip）はなくした。
+ * 前の保存データにあれば、式を数字に置き換えるのに使ってから捨てる（store/storage.ts の readAppData・engine/migrate/numbers.ts）
+ */
 export interface AppData {
   version: 1
   jobs: Job[]
-  /**
-   * 調整寸法の表の行（アプリ全体で1つ。並び＝表の並び）。初めは メラミン1・シート0.5。
-   * 第1.7版から書きかけの行（名前だけ・寸法だけ）も持つ（AdjustRow）。式で使えるのは名前と寸法がそろった行だけ（engine/adjusts の usableAdjusts）
-   */
-  adjusts: AdjustRow[]
   /** 最後にコピーしたセル（第1.2版。仕様書 16.1）。無ければ null。ほかの仕事でも貼れる */
   cellClip: CellClip | null
-  /** 調整寸法の表で最後にコピーしたセル（第1.7版。部材の表の cellClip とは分ける）。無ければ null */
-  adjustClip: AdjustClip | null
-}
-
-/**
- * 調整寸法の表の1行（第1.7版。仕様書 21.1）。書きかけ（名前だけ・寸法だけ）も持てる。
- * - name：空でもよい（前後の空白は外して持つ）
- * - value：0 より大きい数か、空（null）
- * 名前があり寸法が 0 より大きい行が、式で使える調整寸法（Adjust）。書きかけの行を使っている式は「削除した調整寸法」と同じエラーになる。
- * 名前も寸法も空の行は保存しない（表から外す）
- */
-export interface AdjustRow {
-  id: string
-  name: string
-  value: number | null
-}
-
-/** 調整寸法の表の欄（左から 名前・寸法）。範囲（CellRange）の left は 0＝名前・1＝寸法 */
-export type AdjustCol = 'name' | 'value'
-export const ADJUST_COLS: readonly AdjustCol[] = ['name', 'value']
-
-/** 調整寸法の表のセルの位置。row は表の行（0 から。AppData.adjusts の位置。行の数以上は空の行） */
-export interface AdjustCellPos {
-  row: number
-  col: AdjustCol
-}
-
-/**
- * 調整寸法の表でコピーしたセル（第1.7版）。cells[行][列] は名前か寸法の文字（寸法は数字の文字、空は ''）。
- * cut は切り取った元の範囲（表はアプリに1つなので仕事の id は持たない）。無ければふつうのコピー
- */
-export interface AdjustClip {
-  rows: number
-  cols: number
-  cells: string[][]
-  cut?: CellRange
 }
 
 // ---------- セルのコピーと貼り付け（第1.2版。仕様書 16.1） ----------

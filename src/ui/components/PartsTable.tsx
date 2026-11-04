@@ -7,20 +7,18 @@
 // 入力はキーを押すたびに保存する。空の行に入れたときに部材を作り、何も入っていない部材は表から外す（保存しない）。
 // 寸法の計算は engine（computeDimensions の結果を受け取る）。式の文字の編集は formulaEdit.ts
 // 「＝」で始めた入力中は、ほかの部材の W・H のセルを押すと、その寸法（天板.W）をカーソルの位置に入れる（仕様書 20.2。エクセルと同じ）。
-// 表の下に調整寸法の表（AdjustTable。仕様書 21.1）を置き、「＝」の入力中にその行を押すと調整寸法を入れる（仕様書 21.2）。
-// 選ぶ・取っ手・長押しの指の動きは useGrid（調整寸法の表と同じ仕組み）
+// 選ぶ・取っ手・長押しの指の動きは useGrid。
+// 第2.2版（E-21）：調整寸法の表（AdjustTable）は保存データから調整寸法の一覧がなくなったので外した（キー・式の表示は U-27 で直す）
 // 第2.0版（仕様書 24）：見出しを長押しすると並べ替えのメニュー（大きい順・小さい順／あいうえお順・逆の順。並べ替えは engine の sortParts）。
 // 選んでいる行の番号を上下に引くと、その行を動かす（engine の moveParts。指の動きは useGrid）
 import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react'
 import { createPortal, flushSync } from 'react-dom'
-import { normalizePartName, splitLeadingEquals, validatePartName } from '../../engine/formula/tokenize'
+import { normalizePartName, splitLeadingEquals } from '../../engine/formula/tokenize'
 import { formulaUnits } from '../../engine/formula/units'
-import { adjustIdsInExpr } from '../../engine/formula/usages'
-import { isUsableAdjust } from '../../engine/adjusts'
 import { columnRange, rowRange } from '../../engine/clipboard/cells'
 import { movedTop, type SortKey, type SortOrder } from '../../engine/order'
 import { hasName } from '../../engine/parts'
-import { CELL_COLS, type Adjust, type AdjustRow, type Axis, type CellClip, type CellRange, type DimensionResult, type Job, type Part } from '../../engine/types'
+import { CELL_COLS, type Adjust, type Axis, type CellClip, type CellRange, type DimensionResult, type Job, type Part } from '../../engine/types'
 import { currentJob, type ReduceResult, type StoreAction } from '../../store/reducer'
 import { clampRange, clipText, fillExtension, fillHint, fillText, isSingleAt, rangeEnd, rangeHas, rangeText, singleRange } from '../cellSelect'
 import { claimOpen } from '../exclusive'
@@ -45,7 +43,6 @@ import {
 } from '../partsTable'
 import { useLongPress } from '../useLongPress'
 import { rangeKey, useOutsideEnd, usePadHeight, useRevealRow, useGrid, useGridBoxes, type MovableRows, type PressAt } from '../useGrid'
-import { AdjustTable } from './AdjustTable'
 import { CellMenu } from './CellMenu'
 import { FormulaKeys, FormulaView } from './FormulaKeys'
 import { GridOverlay } from './GridOverlay'
@@ -164,7 +161,6 @@ export function PartsTable({ job, dims, adjusts, clip, dispatch, onError, ref }:
   })
   const tableRef = useRef<HTMLDivElement>(null)
   const padRef = useRef<HTMLDivElement>(null)
-  const adjustWrapRef = useRef<HTMLDivElement>(null)
   const nameInputs = useRef(new Map<number, HTMLInputElement>())
   const rowEls = useRef(new Map<number, HTMLDivElement>())
   const headEls = useRef<(HTMLButtonElement | null)[]>([])
@@ -338,14 +334,10 @@ export function PartsTable({ job, dims, adjusts, clip, dispatch, onError, ref }:
     formulaPickingRef.current = formulaPicking
   })
 
-  // 欄を選んでいる間：表とキーの外を押したら閉じる（ほかの表のセルは押したことが決まってから。useOutsideEnd）。
-  // 「＝」で入力している間に調整寸法の表を押したら、入力は続ける（押した調整寸法を式に入れる。仕様書 21.2）
+  // 欄を選んでいる間：表とキーの外を押したら閉じる（ほかの表のセルは押したことが決まってから。useOutsideEnd）
   useOutsideEnd(
     anySel,
-    (t) =>
-      !!tableRef.current?.contains(t) ||
-      !!padRef.current?.contains(t) ||
-      (formulaPickingRef.current() && !!adjustWrapRef.current?.contains(t)),
+    (t) => !!tableRef.current?.contains(t) || !!padRef.current?.contains(t),
     () => selectRef.current(null),
   )
   useEffect(() => {
@@ -479,7 +471,7 @@ export function PartsTable({ job, dims, adjusts, clip, dispatch, onError, ref }:
   const fillDone = (from: CellRange, to: CellRange) => {
     const r = run({ type: 'fillCells', from, to })
     if (!r.ok) return
-    setNotice(r.paste ? fillText(r.paste.pasted, r.paste.skipped, r.paste.renamed.length) : null)
+    setNotice(r.paste ? fillText(r.paste.pasted, r.paste.skipped) : null)
     // 入れたあとは、引いた先まで選ぶ（エクセルと同じ。起点はそのまま）
     const a = activeRef.current
     selectRange(to, a && rangeHas(to, a) ? a : { row: to.top, col: to.left })
@@ -545,43 +537,19 @@ export function PartsTable({ job, dims, adjusts, clip, dispatch, onError, ref }:
     selectRange({ top: nextTop, left: 0, rows, cols: CELL_COLS.length }, act)
   }
 
-  /**
-   * 「＝」で始めた入力中に、調整寸法の表の行を押したとき（仕様書 21.2）：その調整寸法をカーソルの位置に入れる。
-   * 書きかけの行（名前だけ・寸法だけ）は入れずに知らせる
-   */
-  const putAdjust = (row: AdjustRow) => {
-    const editing = curCell()
-    if (!editing || (editing.field !== 'W' && editing.field !== 'H')) return
-    if (!isUsableAdjust(row)) {
-      setRefMsg('名前と寸法をそろえると式で使えます')
-      return
-    }
-    const axis = editing.field
-    const value = splitLeadingEquals(jobRef.current.parts[editing.row]?.expr[axis] ?? '').rest
-    editExpr(editing.row, axis, insertAt(value, cursor, `{n:${row.id}}`))
-  }
-
   // ---------- 表示 ----------
 
   const dimsOf = (partId: string) => dims.parts.find((d) => d.partId === partId)
   const selPart = sel ? parts[sel.row] : undefined
   const selLabel = sel ? (selPart && hasName(selPart) ? selPart.name : `#${sel.row + 1}`) : ''
-  const liveNameError =
-    sel?.field === 'name'
-      ? validatePartName(
-          nameDraft.trim(),
-          parts.filter((_, j) => j !== sel.row).map((p) => p.name),
-        )
-      : null
-  const rowMsg = sel?.field === 'name' ? (nameMsg ?? liveNameError) : null
+  // 第2.2版（仕様書 26.3）：同じ名前も使えるので、入力中の名前の重なりの知らせは出さない
+  const rowMsg = sel?.field === 'name' ? nameMsg : null
 
   const padAxis: Axis | null = sel && (sel.field === 'W' || sel.field === 'H') ? sel.field : null
   // 入力中の式に入っている部材（色の枠の番号。鍵はそろえた部材名）。入力していないときは空
   const editingExpr = padAxis && selPart ? splitLeadingEquals(selPart.expr[padAxis]).rest : ''
   const refColors = refColorsOf(editingExpr)
   const refCells = refCellsOf(editingExpr)
-  // 式に入っている調整寸法（調整寸法の表の行に色の枠）
-  const refAdjustIds = new Set(adjustIdsInExpr(editingExpr))
   /** 式に入っている部材のセルの色の枠（仕様書 20.2。エクセルと同じく部材ごとに色を変える） */
   const refFrame = (part: Part | undefined, axis: Axis): string => {
     if (!part || !hasName(part) || refColors.size === 0) return ''
@@ -831,11 +799,7 @@ export function PartsTable({ job, dims, adjusts, clip, dispatch, onError, ref }:
       <button type="button" className="btn add-rows" onClick={addRows}>
         ＋ 5行足す
       </button>
-      {/* 調整寸法の表（仕様書 21.1）。「＝」で入力している間は、行を押すとその調整寸法を式に入れる（仕様書 21.2） */}
-      <div ref={adjustWrapRef}>
-        <AdjustTable picking={padAxis !== null && equals ? putAdjust : null} refIds={refAdjustIds} onError={onError} />
-      </div>
-      {/* キーを出している間も、表を指でなぞって調整寸法の表までスクロールできるよう、キーの高さの余白を下に取る */}
+      {/* キーを出している間も、表を指でなぞって下までスクロールできるよう、キーの高さの余白を下に取る */}
       {padOpen && <div className="pt-spacer" style={{ height: padH }} aria-hidden="true" />}
       {menuOpen && shown && (
         <CellMenu

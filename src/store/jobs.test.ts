@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { defaultSettings } from '../engine/defaults'
 import { withHistory } from '../engine/fixtures/history'
 import { freezeAt } from '../engine/fixtures/progress'
-import { legacyShelfJob, shelfAdjusts, shelfJob, MELAMINE_ID } from '../engine/fixtures/shelf'
-import type { AdjustRow, Job } from '../engine/types'
+import { shelfJob } from '../engine/fixtures/shelf'
+import type { Job } from '../engine/types'
 import {
-  addAdjust,
   addPart,
   copyJob,
   insertPart,
@@ -13,12 +12,10 @@ import {
   deleteJob,
   makeJob,
   newPart,
-  removeAdjusts,
   removePart,
   renameJob,
   setAllRotatable,
   setSheet,
-  updateAdjust,
   updatePart,
   updateSettings,
 } from './jobs'
@@ -120,22 +117,40 @@ describe('部材', () => {
   it('足す・変える・消す', () => {
     let job = makeJob('x', NOW, 'job')
     job = okJob(addPart(job, newPart('p1', { name: '天板', expr: { W: '400', H: '1800' } })))
-    job = okJob(addPart(job, newPart('p2', { name: '棚板', expr: { W: '天板.W - 20', H: '300' }, quantity: 3 })))
+    job = okJob(addPart(job, newPart('p2', { name: '棚板', expr: { W: '380', H: '300' }, quantity: 3 })))
     expect(job.parts.map((p) => p.name)).toEqual(['天板', '棚板'])
     job = okJob(updatePart(job, 'p2', { quantity: 4, rotatable: true }))
-    expect(job.parts[1]).toMatchObject({ quantity: 4, rotatable: true, expr: { W: '天板.W - 20', H: '300' } })
+    expect(job.parts[1]).toMatchObject({ quantity: 4, rotatable: true, expr: { W: '380', H: '300' } })
     job = okJob(removePart(job, 'p1'))
     expect(job.parts.map((p) => p.id)).toEqual(['p2'])
     expect(removePart(job, 'p1').ok).toBe(false)
   })
 
-  it('同じ名前（全角・半角の違いを含む）は足せない・変えられない', () => {
+  it('同じ名前の部材を足せる・同じ名前に変えられる（第2.2版。仕様書 26.3）', () => {
     let job = makeJob('x', NOW, 'job')
-    job = okJob(addPart(job, newPart('p1', { name: '棚板1' })))
-    const r = addPart(job, newPart('p2', { name: '棚板１' }))
-    expect(r.ok).toBe(false)
-    job = okJob(addPart(job, newPart('p2', { name: '側板' })))
-    expect(updatePart(job, 'p2', { name: '棚板1' }).ok).toBe(false)
+    job = okJob(addPart(job, newPart('p1', { name: '棚板' })))
+    job = okJob(addPart(job, newPart('p2', { name: '棚板' })))
+    job = okJob(addPart(job, newPart('p3', { name: '側板' })))
+    job = okJob(updatePart(job, 'p3', { name: '棚板' }))
+    expect(job.parts.map((p) => [p.id, p.name])).toEqual([
+      ['p1', '棚板'],
+      ['p2', '棚板'],
+      ['p3', '棚板'],
+    ])
+  })
+
+  it('名前の前後の空白は外す。式の記号（+ - × ÷ ( ) . { }）・途中の空白も名前に使える（第2.2版。式で参照しなくなったため。暫定）', () => {
+    let job = makeJob('x', NOW, 'job')
+    job = okJob(addPart(job, newPart('p1', { name: ' 棚板(左) ' })))
+    job = okJob(addPart(job, newPart('p2', { name: '扉 W×H.上' })))
+    expect(job.parts.map((p) => p.name)).toEqual(['棚板(左)', '扉 W×H.上'])
+  })
+
+  it('名前を変えても、ほかの部材は変わらない（式の書き換えはない。第2.2版）', () => {
+    const before = shelfJob()
+    const job = okJob(updatePart(before, 'part-tenita', { name: '天板A' }))
+    expect(job.parts[1].name).toBe('天板A')
+    expect(job.parts.filter((p) => p.id !== 'part-tenita')).toEqual(before.parts.filter((p) => p.id !== 'part-tenita'))
   })
 
   it('枚数は 0 以上の整数', () => {
@@ -154,7 +169,7 @@ describe('部材', () => {
     job = okJob(updatePart(job, 'p3', { name: '' }))
     expect(job.parts[2].name).toBe('')
     job = okJob(updatePart(job, 'p1', { name: '側板' }))
-    expect(updatePart(job, 'p2', { name: '側板' }).ok).toBe(false)
+    expect(okJob(updatePart(job, 'p2', { name: '側板' })).parts.map((p) => p.name)).toEqual(['側板', '側板', ''])
   })
 
   it('枚数は空（null）にできる（第1.1版）', () => {
@@ -173,13 +188,14 @@ describe('部材', () => {
     expect(c.parts[0]).toMatchObject({ name: '', quantity: null })
   })
 
-  it('上に行を入れる：指定した位置に足す（範囲外は最後）。同じ名前は断る', () => {
+  it('上に行を入れる：指定した位置に足す（範囲外は最後）。同じ名前でも足せる（第2.2版）', () => {
     let job = shelfJob()
     job = okJob(insertPart(job, 1, newPart('n1', { name: '', quantity: null })))
     expect(job.parts.map((p) => p.id)).toEqual(['part-zentai', 'n1', 'part-tenita', 'part-gawaita', 'part-tanaita'])
     job = okJob(insertPart(job, 99, newPart('n2', { name: '地板' })))
     expect(job.parts.at(-1)?.id).toBe('n2')
-    expect(insertPart(job, 0, newPart('n3', { name: '天板' })).ok).toBe(false)
+    expect(okJob(insertPart(job, 0, newPart('n3', { name: '天板' }))).parts.filter((p) => p.name === '天板')).toHaveLength(2)
+    expect(insertPart(job, 0, newPart('n2', { name: 'x' }))).toEqual({ ok: false, message: '同じ id の部材があります' })
   })
 
   it('全部回転してよい／全部回転しない。変わらなければ同じ仕事を返す', () => {
@@ -189,48 +205,4 @@ describe('部材', () => {
     expect(okJob(setAllRotatable(job, false)).parts.every((p) => !p.rotatable)).toBe(true)
   })
 
-  it('名前を変えると、使っている式もつけ替わる', () => {
-    const job = okJob(updatePart(legacyShelfJob(), 'part-tenita', { name: '天板A' }))
-    expect(job.parts[3].expr).toEqual({ W: `天板A.W - 20 - {n:${MELAMINE_ID}}`, H: '天板A.H - 20 × 2' })
-  })
-
-  it('名前と式を同時に変えても、新しい式の参照もつけ替わる', () => {
-    const job = okJob(updatePart(legacyShelfJob(), 'part-zentai', { name: '外寸', expr: { W: '500', H: '1800' } }))
-    expect(job.parts[0]).toMatchObject({ name: '外寸', expr: { W: '500', H: '1800' } })
-    expect(job.parts[1].expr).toEqual({ W: '外寸.W', H: '外寸.H' })
-  })
-})
-
-describe('調整寸法', () => {
-  it('足す・変える・消す', () => {
-    let list: AdjustRow[] = shelfAdjusts()
-    const r1 = addAdjust(list, { name: ' 逃げ ', value: 1 }, 'a-nige')
-    if (!r1.ok) throw new Error(r1.message)
-    list = r1.adjusts
-    expect(list.at(-1)).toEqual({ id: 'a-nige', name: '逃げ', value: 1 })
-    const r2 = updateAdjust(list, 'a-nige', { name: '逃げ', value: 0.5 })
-    if (!r2.ok) throw new Error(r2.message)
-    expect(r2.adjusts.at(-1)?.value).toBe(0.5)
-    const r3 = removeAdjusts(r2.adjusts, ['a-nige', MELAMINE_ID])
-    if (!r3.ok) throw new Error(r3.message)
-    expect(r3.adjusts.map((a) => a.name)).toEqual(['シート'])
-  })
-
-  it('名前が空・寸法が 0 以下・表示名が重なるものは断る', () => {
-    const list = shelfAdjusts()
-    expect(addAdjust(list, { name: '', value: 1 }, 'x').ok).toBe(false)
-    expect(addAdjust(list, { name: '逃げ', value: 0 }, 'x').ok).toBe(false)
-    const dup = addAdjust(list, { name: 'メラミン', value: 1 }, 'x')
-    expect(dup).toEqual({ ok: false, message: '「メラミン1」はもうあります' })
-    // 名前「逃げ1」寸法5 と 名前「逃げ」寸法15 は同じ「逃げ15」
-    const a = addAdjust(list, { name: '逃げ1', value: 5 }, 'x')
-    if (!a.ok) throw new Error(a.message)
-    expect(addAdjust(a.adjusts, { name: '逃げ', value: 15 }, 'y').ok).toBe(false)
-  })
-
-  it('自分自身とは重ならない（寸法を変えずに名前の空白だけ直せる）', () => {
-    const list = shelfAdjusts()
-    expect(updateAdjust(list, MELAMINE_ID, { name: 'メラミン ', value: 1 }).ok).toBe(true)
-    expect(updateAdjust(list, MELAMINE_ID, { name: 'シート', value: 0.5 }).ok).toBe(false)
-  })
 })
