@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createJob } from '../defaults'
 import { computeDimensions } from '../dimensions'
-import { MELAMINE_ID, shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { MELAMINE_ID, shelfJob } from '../fixtures/shelf'
 import type { CellClip, CellCol, CellPos, Job, Part } from '../types'
 import {
   cellText,
@@ -69,13 +69,13 @@ describe('selectionShape（1つ／四角い範囲／それ以外）', () => {
   })
 })
 
-describe('copyCells（式は式のまま）', () => {
-  it('1つのセル：式は書いたまま（部材名も名前のまま）', () => {
+describe('copyCells（中身は書いたまま）', () => {
+  it('1つのセル：W・H は書いた数字のまま', () => {
     const r = copyCells(shelfJob(), [c(3, 'W')])
-    expect(r).toEqual({ ok: true, clip: { rows: 1, cols: 1, cells: [[`天板.W - 20 - {n:${MELAMINE_ID}}`]] } })
+    expect(r).toEqual({ ok: true, clip: { rows: 1, cols: 1, cells: [['379']] } })
   })
 
-  it('範囲：名前・式・枚数を形つきで。枚数が空・空の行は空の文字', () => {
+  it('範囲：名前・W・H・枚数を形つきで。枚数が空・空の行は空の文字', () => {
     const job = shelfJob()
     job.parts[2].quantity = null
     const r = copyCells(job, [c(2, 'name'), c(2, 'W'), c(2, 'H'), c(2, 'qty'), c(3, 'name'), c(3, 'W'), c(3, 'H'), c(3, 'qty'), c(4, 'name'), c(4, 'W'), c(4, 'H'), c(4, 'qty')])
@@ -83,8 +83,8 @@ describe('copyCells（式は式のまま）', () => {
       rows: 3,
       cols: 4,
       cells: [
-        ['側板', '全体.W', '700', ''],
-        ['棚板', `天板.W - 20 - {n:${MELAMINE_ID}}`, '天板.H - 20 × 2', '3'],
+        ['側板', '400', '700', ''],
+        ['棚板', '379', '1760', '3'],
         ['', '', '', ''],
       ],
     })
@@ -103,7 +103,7 @@ describe('copyCells（式は式のまま）', () => {
     const job = shelfJob()
     const r = copyCells(job, [c(1, 'W')])
     job.parts[1].expr.W = '1'
-    expect(r.ok && r.clip.cells).toEqual([['全体.W']])
+    expect(r.ok && r.clip.cells).toEqual([['400']])
   })
 })
 
@@ -120,22 +120,28 @@ describe('pasteCells：1つのセルをコピーしたとき', () => {
     expect(r.skipped).toEqual([])
   })
 
-  it('式は文字のまま貼る（ほかの仕事に貼っても式のまま。参照できなければ計算のエラー）', () => {
+  it('W・H の数字は、ほかの仕事に貼っても同じ数字（棚板の W 379 を貼る）', () => {
     const src = shelfJob()
     const clip = okCopy(copyCells(src, [c(3, 'W')]))
     const other = jobOf(part('a', 'A', '100', '200'))
     const r = okPaste(pasteCells(other, clip, [c(0, 'W')], ids()))
-    expect(r.job.parts[0].expr.W).toBe(`天板.W - 20 - {n:${MELAMINE_ID}}`)
-    const d = computeDimensions(r.job, shelfAdjusts())
-    expect(d.parts[0].finished).toBeNull()
+    expect(r.job.parts[0].expr.W).toBe('379')
+    expect(computeDimensions(r.job).parts[0].finished).toEqual({ W: 379, H: 200 })
   })
 
-  it('同じ仕事の中で式を貼ると、その場で計算できる（棚板の W を側板の W に）', () => {
-    const job = shelfJob()
-    const clip = okCopy(copyCells(job, [c(3, 'W')]))
-    const r = okPaste(pasteCells(job, clip, [c(2, 'W')], ids()))
-    const d = computeDimensions(r.job, shelfAdjusts())
-    expect(d.parts[2].finished).toEqual({ W: 379, H: 700 })
+  it('W・H は数字だけ貼る（第2.2版。仕様書 26.1）：0 より大きい数（全角・小数も）は数字にそろえて貼る。式・名前の文字・0 は貼らない', () => {
+    const job = jobOf(part('a', 'A'), part('b', 'B'))
+    expect(okPaste(pasteCells(job, clipOf([['４００.５０']]), [c(0, 'W')], ids())).job.parts[0].expr.W).toBe('400.5')
+    expect(okPaste(pasteCells(job, clipOf([['']]), [c(0, 'H')], ids())).job.parts[0].expr.H).toBe('')
+    for (const bad of ['天板.W - 20', '1800 - 40', '棚板', '0', '-5', `{n:${MELAMINE_ID}}`]) {
+      const r = okPaste(pasteCells(job, clipOf([[bad]]), [c(0, 'W'), c(1, 'H')], ids()))
+      expect(r.pasted).toBe(0)
+      expect(r.skipped).toEqual([
+        { cell: c(0, 'W'), reason: 'notSize', message: 'W・H には 0 より大きい数だけ貼れます' },
+        { cell: c(1, 'H'), reason: 'notSize', message: 'W・H には 0 より大きい数だけ貼れます' },
+      ])
+      expect(r.job).toBe(job)
+    }
   })
 
   it('仕様書 18.3：「棚板」をコピーして2つのセルに貼ると「棚板1」「棚板2」。コピー元の「棚板」はそのまま', () => {
@@ -229,13 +235,6 @@ describe('pasteCells：1つのセルをコピーしたとき', () => {
     expect(r2.renamed).toEqual([])
   })
 
-  it('名前を貼っても、ほかの式の参照は書き換えない（名前の変更ではない）', () => {
-    const job = shelfJob()
-    const r = okPaste(pasteCells(job, clipOf([['天板2']]), [c(1, 'name')], ids()))
-    expect(r.job.parts[1].name).toBe('天板2')
-    expect(r.job.parts[3].expr.W).toBe(`天板.W - 20 - {n:${MELAMINE_ID}}`)
-  })
-
   it('名前に使えない文字（式の記号）は貼らない', () => {
     const job = shelfJob()
     const r = okPaste(pasteCells(job, clipOf([['全体.W']]), [c(1, 'name')], ids()))
@@ -258,13 +257,6 @@ describe('pasteCells：1つのセルをコピーしたとき', () => {
       ])
       expect(r.job).toBe(job)
     }
-  })
-
-  it('W・H に名前の文字を貼ると、式として入る（読めなければ計算のエラー）', () => {
-    const job = shelfJob()
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), [c(2, 'H')], ids()))
-    expect(r.job.parts[2].expr.H).toBe('棚板')
-    expect(computeDimensions(r.job, shelfAdjusts()).parts[2].finished).toBeNull()
   })
 
   it('空の行に貼ると部材を作る（枚数は空から。途中の空の行でも、部材の後ろに詰めて足す）', () => {
@@ -319,8 +311,8 @@ describe('pasteCells：範囲をコピーしたとき', () => {
     const r = okPaste(pasteCells(job, clip, [c(3, 'W')], ids()))
     expect(r.job.parts).toHaveLength(5)
     expect(table(r.job).slice(3)).toEqual([
-      ['棚板', '全体.W', '700', 2],
-      ['', `天板.W - 20 - {n:${MELAMINE_ID}}`, '天板.H - 20 × 2', 3],
+      ['棚板', '400', '700', 2],
+      ['', '379', '1760', 3],
     ])
     expect(r.job.parts[4]).toMatchObject({ id: 'part-new1', rotatable: false, finishedDone: false })
   })
@@ -340,9 +332,9 @@ describe('pasteCells：範囲をコピーしたとき', () => {
     const r = okPaste(pasteCells(other, clip, [c(0, 'name')], ids()))
     expect(table(r.job)).toEqual([
       ['全体', '400', '1800', 0],
-      ['天板', '全体.W', '全体.H', 1],
+      ['天板', '400', '1800', 1],
     ])
-    expect(computeDimensions(r.job, shelfAdjusts()).parts[1].finished).toEqual({ W: 400, H: 1800 })
+    expect(computeDimensions(r.job).parts[1].finished).toEqual({ W: 400, H: 1800 })
   })
 
   it('同じ名前は番号を振って貼り、枚数に式は貼られず貼れなかったセルが返る（ほかのセルは貼る）', () => {
@@ -398,12 +390,15 @@ describe('pasteCells：範囲をコピーしたとき', () => {
 
   it('部材 150 行に名前・数字をまとめて貼っても、すぐ終わる', () => {
     const job = jobOf(...Array.from({ length: 150 }, (_, i) => part(`p${i}`, `部材${i}`)))
-    const sel = Array.from({ length: 150 }, (_, i) => [c(i, 'name'), c(i, 'W')]).flat()
+    const names = Array.from({ length: 150 }, (_, i) => c(i, 'name'))
+    const widths = Array.from({ length: 150 }, (_, i) => c(i, 'W'))
     const t = performance.now()
-    const r = okPaste(pasteCells(job, clipOf([['棚板']]), sel, ids()))
+    const r1 = okPaste(pasteCells(job, clipOf([['棚板']]), names, ids()))
+    const r = okPaste(pasteCells(r1.job, clipOf([['379.5']]), widths, ids()))
     expect(performance.now() - t).toBeLessThan(1000)
-    expect(r.pasted).toBe(300)
-    expect(r.skipped).toHaveLength(0)
+    expect(r1.pasted + r.pasted).toBe(300)
+    expect([...r1.skipped, ...r.skipped]).toHaveLength(0)
+    expect(r.job.parts[149].expr.W).toBe('379.5')
     expect(r.job.parts.slice(0, 3).map((p) => p.name)).toEqual(['棚板1', '棚板2', '棚板3'])
     expect(r.job.parts[149].name).toBe('棚板150')
   })
@@ -417,14 +412,14 @@ describe('pasteCells：範囲をコピーしたとき', () => {
 })
 
 describe('clearCells（消す）', () => {
-  it('選んだセルの中身を空にする（枚数は空。名前を消しても式は書き換えない）', () => {
+  it('選んだセルの中身を空にする（枚数は空）', () => {
     const job = shelfJob()
     const next = clearCells(job, [c(1, 'name'), c(2, 'W'), c(3, 'qty')])
     expect(table(next)).toEqual([
       ['全体', '400', '1800', 0],
-      ['', '全体.W', '全体.H', 1],
+      ['', '400', '1800', 1],
       ['側板', '', '700', 2],
-      ['棚板', `天板.W - 20 - {n:${MELAMINE_ID}}`, '天板.H - 20 × 2', null],
+      ['棚板', '379', '1760', null],
     ])
   })
 

@@ -3,11 +3,10 @@ import { computeDimensions } from '../dimensions'
 import { addHistory, historyEntry } from '../history'
 import { packJob } from '../packing'
 import type { Job } from '../types'
-import { shelfAdjusts } from './shelf'
 
-/** 今の設定と部材を、見本の調整寸法で計算して履歴に残した仕事（id・メモ・日時は引数） */
+/** 今の設定と部材を計算して履歴に残した仕事（id・メモ・日時は引数） */
 export function withHistory(job: Job, id: string, memo = '', now = new Date('2026-11-04T09:00:00.000Z')): Job {
-  const r = addHistory(job, historyEntry(job, packJob(job, computeDimensions(job, shelfAdjusts())), { id, memo, now }))
+  const r = addHistory(job, historyEntry(job, packJob(job, computeDimensions(job)), { id, memo, now }))
   if (!r.ok) throw new Error(r.message)
   return r.job
 }

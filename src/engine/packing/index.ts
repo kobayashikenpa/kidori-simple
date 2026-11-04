@@ -81,7 +81,7 @@ function unplacedOf(job: Pick<Job, 'parts'>, known: readonly Unplaced[], pieces:
 }
 
 /**
- * 木取りの計算（仕様書 7・8）。dims は computeDimensions(job, adjusts) の結果（木取り寸法を並べる）。
+ * 木取りの計算（仕様書 7・8）。dims は computeDimensions(job) の結果（木取り寸法を並べる）。
  * 1. 部材を片にする（枚数0 の行は除く。寸法のエラーは skipped。固定した1枚の片を引く）
  * 必要な枚数（sheetCount）と全体の歩留まりは、固定した1枚（切り終わりを含む）と計算した1枚を合わせて出す
  * 2. 板に向きの入らない部材は unplaced（tooLarge）。向きは設定の切り方の範囲で判定する

@@ -2,15 +2,17 @@
 // 範囲（四角）・切り取り・オートフィル（第1.3版。仕様書 17.3・17.4）。新しく作ったもの（kidori には無い）。
 // - セルの位置は { row: 表の行（0 から。job.parts の位置。部材の数以上は空の行）, col: 名前・W・H・枚数 }
 // - 選んだセルは、セルの配列か四角い範囲（CellRange）のどちらでも渡せる（CellSelection）
-// - コピーは「1つのセル」か「四角い範囲（続いた行 × 続いた列）」だけ。中身は文字のまま（式は書いたまま、枚数は数字の文字）
-// - 貼り付けは中身の上書き（名前を貼っても、ほかの式の参照は書き換えない。名前の変更ではない）
+// - コピーは「1つのセル」か「四角い範囲（続いた行 × 続いた列）」だけ。中身は文字のまま（W・H は数字の文字、枚数は数字の文字）
+// - 貼り付けは中身の上書き。W・H には数字だけ貼る（第2.2版。仕様書 26.1）
 // 仕事は書き換えず、新しい仕事を返す（updatedAt とコピーしたセル AppData.cellClip の保存は store の側で行う）
 import { normalizeFormulaText, normalizePartName, validatePartName } from '../formula/tokenize'
 import { isBlankPart } from '../parts'
+import { pastedSize } from '../size'
 import { CELL_COLS, type CellClip, type CellCol, type CellPos, type CellRange, type Job, type Part } from '../types'
 
 export const COPY_SHAPE_MESSAGE = 'コピーは1つのセルか、四角い範囲を選んでください'
 export const NOT_QUANTITY_MESSAGE = '枚数には 0 以上の整数だけ貼れます'
+export const NOT_SIZE_MESSAGE = 'W・H には 0 より大きい数だけ貼れます'
 export const FILL_RANGE_MESSAGE = '引く元の範囲を選んでください'
 
 /** 選んだセル：セルの配列か、四角い範囲（第1.3版。画面は四角で持つ） */
@@ -129,10 +131,11 @@ export function cutCells(job: Pick<Job, 'id' | 'parts'>, selected: CellSelection
 }
 
 /**
- * 貼れなかった理由。invalidName：名前に使えない文字 / notQuantity：枚数に 0 以上の整数でないもの。
+ * 貼れなかった理由。invalidName：名前に使えない文字 / notQuantity：枚数に 0 以上の整数でないもの /
+ * notSize：W・H に 0 より大きい数でないもの（式・名前の文字・0。第2.2版。仕様書 26.1）。
  * 第1.4版で、同じ名前になるときは貼らずに番号を振るようにした（duplicateName・fillName はなくした。仕様書 18.3）
  */
-export type PasteSkipReason = 'invalidName' | 'notQuantity'
+export type PasteSkipReason = 'invalidName' | 'notQuantity' | 'notSize'
 
 /** 名前が重なるので番号を振って貼ったセル（第1.4版。仕様書 18.3）。from は貼ろうとした名前、to は振ったあとの名前 */
 export interface PasteRenamed {
@@ -251,7 +254,12 @@ function applyTargets(job: Job, targets: Target[], newId: (prefix: string) => st
   for (const w of writes) {
     const p = parts[w.index]
     if (w.cell.col === 'W' || w.cell.col === 'H') {
-      p.expr[w.cell.col] = w.text
+      const size = pastedSize(w.text)
+      if (size === undefined) {
+        skipped.push({ cell: w.cell, reason: 'notSize', message: NOT_SIZE_MESSAGE })
+        continue
+      }
+      p.expr[w.cell.col] = size
     } else if (w.cell.col === 'qty') {
       const q = quantityOf(w.text)
       if (q === undefined) {
@@ -401,7 +409,7 @@ function sameAsClip(job: Pick<Job, 'parts'>, clip: CellClip, cell: CellPos): boo
  * - 名前：前後の空白を外して入れる。貼ったあと同じ名前（normalizePartName。名前のある部材どうし）になるときは、
  *   後ろに番号を振って貼る（棚板 → 棚板1、棚板2 …。終わりの数字は外して振る：棚板1 → 棚板2。振ったものは renamed。第1.4版。assignNames）。使えない文字の名前は貼らない。
  *   ほかの式の参照は書き換えない
- * - 枚数：0 以上の整数だけ（空は空にする）。W・H：文字のまま式として入れる
+ * - 枚数：0 以上の整数だけ（空は空にする）。W・H：0 より大きい数だけ（全角・余分な 0 はそろえる。空は空にする。式・名前の文字・0 は notSize。第2.2版）
  * - 貼って行の全部の欄が空になった部材は消す。1つも貼れなかったときは同じ仕事を返す
  * - 切り取り（clip.cut）：元のセルを空にする（第1.3版）。貼る先と重なるセル・1つも貼れなかったクリップの位置・
  *   切り取ったあとに書き換えたセルは空にしない。同じ仕事なら返す job の中で空にし（名前は空にしたあとで重なりを比べる）、

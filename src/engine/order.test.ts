@@ -1,12 +1,10 @@
 // 部材の並べ替えと行の移動（第2.0版。仕様書 24）
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from './dimensions'
-import { shelfAdjusts, shelfJob } from './fixtures/shelf'
+import { shelfJob } from './fixtures/shelf'
 import { movedTop, moveParts, sameOrder, sortParts } from './order'
 import { partLabels } from './parts'
 import type { Job, Part } from './types'
-
-const adjusts = shelfAdjusts()
 
 function part(id: string, name: string, W: string, H: string, quantity: number | null): Part {
   return { id, name, expr: { W, H }, quantity, rotatable: false, finishedDone: false }
@@ -20,7 +18,7 @@ function withParts(...parts: Part[]): Job {
 
 const ids = (parts: readonly Part[]) => parts.map((p) => p.id)
 const sorted = (job: Job, key: 'name' | 'W' | 'H' | 'qty', order: 'asc' | 'desc') =>
-  ids(sortParts(job.parts, computeDimensions(job, adjusts), key, order))
+  ids(sortParts(job.parts, computeDimensions(job), key, order))
 
 describe('並べ替え（仕様書 24.1）', () => {
   // 6章の棚：全体 400×1800（0枚）、天板 400×1800（1枚）、側板 400×700（2枚）、棚板 379×1760（3枚）
@@ -77,14 +75,14 @@ describe('並べ替え（仕様書 24.1）', () => {
   it('元の配列は書き換えない。中身（寸法・枚数・回転・仕上がり）はそのまま', () => {
     const job = shelfJob()
     const before = ids(job.parts)
-    const r = sortParts(job.parts, computeDimensions(job, adjusts), 'W', 'asc')
+    const r = sortParts(job.parts, computeDimensions(job), 'W', 'asc')
     expect(ids(job.parts)).toEqual(before)
     for (const p of r) expect(p).toBe(job.parts.find((q) => q.id === p.id))
   })
 
   it('並べ替えたあと、名前の無い部材の「#3」は新しい行の番号になる', () => {
     const job: Job = { ...shelfJob(), parts: [part('a', '天板', '900', '400', 1), part('b', '', '300', '200', 1), part('c', '', '600', '200', 1)] }
-    const r = sortParts(job.parts, computeDimensions(job, adjusts), 'W', 'asc')
+    const r = sortParts(job.parts, computeDimensions(job), 'W', 'asc')
     expect(partLabels(r).get('b')).toBe('#1')
     expect(partLabels(r).get('c')).toBe('#2')
   })
@@ -92,7 +90,7 @@ describe('並べ替え（仕様書 24.1）', () => {
   it('sameOrder：同じ並びか', () => {
     const job = shelfJob()
     expect(sameOrder(job.parts, [...job.parts])).toBe(true)
-    expect(sameOrder(job.parts, sortParts(job.parts, computeDimensions(job, adjusts), 'W', 'asc'))).toBe(false)
+    expect(sameOrder(job.parts, sortParts(job.parts, computeDimensions(job), 'W', 'asc'))).toBe(false)
   })
 })
 

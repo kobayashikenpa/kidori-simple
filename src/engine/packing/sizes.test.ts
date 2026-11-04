@@ -1,7 +1,7 @@
 // 3×6 と 4×8 の比べ（kidori の packing/sizes.test.ts をもとに、材料ごとの行・重ね切り・手持ち・木取り済みを外したもの）
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from '../dimensions'
-import { shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { shelfJob } from '../fixtures/shelf'
 import { BOARD_SIZES, type CutMode, type Job, type Part } from '../types'
 import { packJob } from './index'
 import { compareStandardSizes, pickBetterSize, type SizeSummary, type StandardSize } from './sizes'
@@ -9,7 +9,7 @@ import { compareStandardSizes, pickBetterSize, type SizeSummary, type StandardSi
 const pct = (r: number) => Math.round(r * 1000) / 10
 
 function compare(job: Job) {
-  return compareStandardSizes(job, computeDimensions(job, shelfAdjusts()))
+  return compareStandardSizes(job, computeDimensions(job))
 }
 
 /** [種類, 枚数, 歩留まり%, 入らない部材の数] */
@@ -25,7 +25,7 @@ function part(id: string, W: string, H: string, quantity = 1, rotatable = false)
 function packAs(job: Job, kind: StandardSize) {
   const [width, length] = BOARD_SIZES[kind]
   const j: Job = { ...job, settings: { ...job.settings, sheet: { sizeKind: kind, width, length } } }
-  return packJob(j, computeDimensions(j, shelfAdjusts()))
+  return packJob(j, computeDimensions(j))
 }
 
 describe('compareStandardSizes（3×6 と 4×8 の比べ）', () => {
@@ -116,7 +116,7 @@ describe('compareStandardSizes（3×6 と 4×8 の比べ）', () => {
     job.parts = Array.from({ length: 50 }, (_, i) =>
       part(`部材${i}`, String(100 + ((i * 37) % 400)), String(150 + ((i * 53) % 900)), 3, i % 3 === 0),
     )
-    const dims = computeDimensions(job, shelfAdjusts())
+    const dims = computeDimensions(job)
     const t = performance.now()
     const r = compareStandardSizes(job, dims)
     expect(performance.now() - t).toBeLessThan(1000)

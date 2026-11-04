@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MELAMINE_ID, shelfJob } from '../fixtures/shelf'
+import { MELAMINE_ID, legacyShelfJob as shelfJob } from '../fixtures/shelf'
 import { renamePart, renameRefsInExpr } from './rename'
 
 describe('renameRefsInExpr（式の中の参照のつけ替え）', () => {

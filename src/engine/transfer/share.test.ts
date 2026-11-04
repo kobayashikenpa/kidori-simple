@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { withHistory } from '../fixtures/history'
 import { freezeAt } from '../fixtures/progress'
-import { MELAMINE_ID, SHEET_ID, shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { legacyShelfJob, MELAMINE_ID, SHEET_ID, shelfAdjusts, shelfJob } from '../fixtures/shelf'
 import { buildJobFile, jobFile, jobFileName } from './share'
 
 /** 見本の棚に、切り出しチェックと仕上がりの完了を付けたもの */
@@ -22,11 +22,11 @@ describe('jobFile・buildJobFile', () => {
   })
 
   it('調整寸法は、その仕事の式で使っているものだけ（見本はメラミン1 だけ）', () => {
-    expect(jobFile(shelfJob(), shelfAdjusts()).adjusts).toEqual([{ id: MELAMINE_ID, name: 'メラミン', value: 1 }])
+    expect(jobFile(legacyShelfJob(), shelfAdjusts()).adjusts).toEqual([{ id: MELAMINE_ID, name: 'メラミン', value: 1 }])
   })
 
   it('両方使っていれば両方（アプリの一覧の並び）。使っていない調整寸法・削除した調整寸法は入れない', () => {
-    const job = shelfJob()
+    const job = legacyShelfJob()
     job.parts[2].expr.H = `700 - {n:${SHEET_ID}} - {n:gone}`
     const extra = [...shelfAdjusts(), { id: 'adjust-hozo', name: 'ほぞ', value: 15 }]
     expect(jobFile(job, extra).adjusts.map((a) => a.id)).toEqual([MELAMINE_ID, SHEET_ID])

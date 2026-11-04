@@ -16,7 +16,8 @@ describe('readTransferFile：読めるファイル', () => {
     if (!r.ok || r.kind !== 'job') throw new Error('読めない')
     expect(r.summary).toEqual({ jobName: '棚', partCount: 4 })
     expect(r.file.job.parts.map((p) => p.name)).toEqual(['全体', '天板', '側板', '棚板'])
-    expect(r.file.adjusts.map((a) => a.name)).toEqual(['メラミン'])
+    // 第2.2版から式は無いので、送るファイルに入る調整寸法も無い
+    expect(r.file.adjusts).toEqual([])
   })
 
   it('バックアップ：種類 backup と、確認に出す仕事の数・名前', () => {

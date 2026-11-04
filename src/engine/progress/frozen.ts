@@ -69,7 +69,7 @@ function currentSizeLabel(d: PartDimensions | undefined): string | null {
 }
 
 /**
- * 固定した1枚ごとの表示用のまとめ（frozenSheets の並び）。dims は computeDimensions(job, adjusts) の結果。
+ * 固定した1枚ごとの表示用のまとめ（frozenSheets の並び）。dims は computeDimensions(job) の結果。
  * 1つの部材に理由が重なったら removed → count → size の順で1つにする（固定は外さない）
  */
 export function frozenSheetViews(job: Pick<Job, 'parts' | 'frozenSheets'>, dims: DimensionResult): FrozenSheetView[] {

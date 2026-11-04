@@ -1,6 +1,6 @@
 // kidori の dimensions/resolve.test.ts をもとに、見本を仕様書 6章の棚（全体・天板・側板・棚板）に、軸を W・H にしたもの
 import { describe, expect, it } from 'vitest'
-import { shelfJob } from '../fixtures/shelf'
+import { legacyShelfJob as shelfJob } from '../fixtures/shelf'
 import type { Axis, Part } from '../types'
 import { partsReferencing, resolve } from './resolve'
 

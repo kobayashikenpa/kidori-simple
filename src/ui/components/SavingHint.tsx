@@ -17,7 +17,7 @@ export function SavingHint({ job, adjusts }: { job: Job; adjusts: readonly Adjus
   )
   // 何回も木取りを計算し直すので、木取りの結果を先に出してから後回しで計算する（最初は null）
   const deferred = useDeferredValue<typeof input | null>(input, null)
-  const hint = useMemo(() => (deferred ? findSavingHint(deferred.job, deferred.adjusts) : null), [deferred])
+  const hint = useMemo(() => (deferred ? findSavingHint(deferred.job) : null), [deferred])
   // まだ前の内容で計算した結果を出しているとき
   const pending = deferred !== null && deferred !== input
 

@@ -1,16 +1,13 @@
 // 調整寸法の表（第1.7版。仕様書 21.1・21.3）：保存データ・ファイル・store の操作
 import { describe, expect, it } from 'vitest'
-import { adjustChangeUsages, usableAdjusts } from '../engine/adjusts'
-import { computeDimensions } from '../engine/dimensions'
-import { MELAMINE_ID, SHEET_ID, shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
+import { usableAdjusts } from '../engine/adjusts'
+import { MELAMINE_ID, SHEET_ID, shelfAdjusts, legacyShelfJob as shelfJob } from '../engine/fixtures/shelf'
 import { formulaText } from '../engine/formula/display'
 import { backupFile } from '../engine/transfer/backup'
-import { importTransfer } from '../engine/transfer/importFile'
 import { jobFile } from '../engine/transfer/share'
 import type { AdjustRow, AppData } from '../engine/types'
 import { validateAdjust } from './jobs'
-import { adjustTableOutcome, initialState, reduce, type Env, type StoreAction, type StoreState } from './reducer'
-import { sampleJob } from './sample'
+import { initialState, reduce, type Env, type StoreAction, type StoreState } from './reducer'
 import { parseAppData } from './storage'
 
 const T0 = new Date(2026, 9, 25, 9, 0, 0)
@@ -27,7 +24,7 @@ function data(adjusts: AdjustRow[] = shelfAdjusts()): AppData {
 }
 
 function start(adjusts?: AdjustRow[]): StoreState {
-  return initialState({ status: 'ok', data: data(adjusts), currentJobId: 'job-shelf', canSave: true })
+  return initialState({ status: 'ok', data: data(adjusts), currentJobId: 'job-shelf', canSave: true, numbering: { replaced: false, cleared: [] } })
 }
 
 function run(state: StoreState, action: StoreAction, e: Env = env()) {
@@ -71,23 +68,6 @@ describe('ファイル（共有・バックアップ・取り込み）', () => {
     job.parts[2].expr.H = '700 - {n:adjust-hozo}'
     expect(jobFile(job, draftRows()).adjusts.map((a) => a.id)).toEqual([MELAMINE_ID])
     expect(backupFile(data(draftRows())).adjusts.map((a) => a.id)).toEqual([MELAMINE_ID, SHEET_ID])
-  })
-
-  it('取り込みは、今の表の書きかけの行とは合わせない（同じ名前でも新しく足す）', () => {
-    const rows: AdjustRow[] = [{ id: 'mine', name: 'メラミン', value: null }, shelfAdjusts()[1]]
-    const file = jobFile(shelfJob(), shelfAdjusts())
-    const r = importTransfer(data(rows), file, env().newId, T0)
-    expect(r.addedAdjusts.map((a) => [a.name, a.value])).toEqual([['メラミン', 1]])
-    expect(r.data.adjusts).toHaveLength(3)
-    const got = r.data.jobs.at(-1)!
-    expect(computeDimensions(got, usableAdjusts(r.data.adjusts)).errors).toEqual([])
-  })
-
-  it('見本は、書きかけの「メラミン」ではなくメラミン1 を足して使う', () => {
-    const rows: AdjustRow[] = [{ id: 'mine', name: 'メラミン', value: null }]
-    const r = sampleJob(rows, T0, env().newId)
-    expect(r.adjusts).toHaveLength(2)
-    expect(computeDimensions(r.job, usableAdjusts(r.adjusts)).errors).toEqual([])
   })
 
   it('今までの「追加」は書きかけの行と重ならない', () => {
@@ -156,27 +136,4 @@ describe('store：調整寸法の表の操作', () => {
     })
   })
 
-  it('確認の流れ：操作のあとの表を作り、ほかの仕事で使っている調整寸法が変わるかを調べる', () => {
-    const s = start()
-    const action = { type: 'setAdjustCell', pos: { row: 0, col: 'value' }, text: '2' } as const
-    const o = adjustTableOutcome(s.data, action, env().newId)
-    if (!o.ok) throw new Error(o.message)
-    const u = adjustChangeUsages(s.data.jobs, s.data.adjusts, o.adjusts, s.currentJobId)
-    expect(u.changed.map((a) => a.id)).toEqual([MELAMINE_ID])
-    expect(u.otherJobCount).toBe(1)
-    expect(u.jobCount).toBe(2)
-    // 確認のあとで当てる。全部の仕事の式の値がついてくる
-    const next = run(s, action).state
-    for (const job of next.data.jobs) {
-      expect(computeDimensions(job, usableAdjusts(next.data.adjusts)).parts[3].finished?.W).toBe(378)
-    }
-  })
-
-  it('書きかけにした調整寸法を使う式は「削除した調整寸法」のエラーになり、寸法を戻すと直る', () => {
-    let s = run(start(), { type: 'clearAdjustCells', cells: [{ row: 0, col: 'value' }] }).state
-    const kinds = computeDimensions(s.data.jobs[0], usableAdjusts(s.data.adjusts)).parts[3].errors.map((e) => e.kind)
-    expect(kinds).toContain('unknownAdjust')
-    s = run(s, { type: 'setAdjustCell', pos: { row: 0, col: 'value' }, text: '1' }).state
-    expect(computeDimensions(s.data.jobs[0], usableAdjusts(s.data.adjusts)).errors).toEqual([])
-  })
 })

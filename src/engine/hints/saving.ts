@@ -5,7 +5,7 @@
 import { computeDimensions } from '../dimensions'
 import { packJob } from '../packing'
 import { round1 } from '../round'
-import type { Adjust, Job, PackingResult } from '../types'
+import type { Job, PackingResult } from '../types'
 
 export type SavingKind = 'allowance' | 'trim'
 
@@ -43,8 +43,8 @@ export function savingMessage(kind: SavingKind, value: number, from: number, to:
   return `${KIND_LABEL[kind]}を ${round1(value)}mm にすると、板が ${from - to} 枚減ります`
 }
 
-function pack(job: Job, adjusts: readonly Adjust[]): PackingResult {
-  return packJob(job, computeDimensions(job, adjusts))
+function pack(job: Job): PackingResult {
+  return packJob(job, computeDimensions(job))
 }
 
 /** 試した結果で減ったか：必要な枚数が減り、入らない部材が増えない（kidori と同じ） */
@@ -54,25 +54,24 @@ function reduced(base: PackingResult, trial: PackingResult): boolean {
 
 /**
  * 板を減らせるときのお知らせ（仕様書 19.2）。無ければ null。仕事のデータは書き換えない。板・切り方・刃厚は今のまま。
- * adjusts はアプリ全体の調整寸法（computeDimensions に渡すもの）。
  * 1. 切り代を `smallerSteps` の値で大きい値から計算し直し、必要な枚数が減った最初の値（＝減る一番大きい値）で知らせる
  * 2. 切り代で減らなければ、端切りを同じように試す
  * 切り代と端切りを同時に変える組み合わせは試さない。固定した1枚（frozenSheets）はそのまま数え、残りの部材だけで試す
  * （packJob と同じ）。今の枚数が 1 枚以下なら試さない。
  * 計算は最大で 1 +（切り代の試す数）+（端切りの試す数）回の packJob。減った所で止める（kidori と同じ結果）
  */
-export function findSavingHint(job: Job, adjusts: readonly Adjust[]): SavingHint | null {
+export function findSavingHint(job: Job): SavingHint | null {
   const allowances = smallerSteps(job.settings.allowance)
   const trims = smallerSteps(job.settings.trim)
   if (allowances.length === 0 && trims.length === 0) return null
 
-  const base = pack(job, adjusts)
+  const base = pack(job)
   // 1枚以下ならそれ以上減らない
   if (base.sheetCount < 2) return null
 
   const tryKind = (kind: SavingKind, values: readonly number[]): SavingHint | null => {
     for (const value of values) {
-      const trial = pack({ ...job, settings: { ...job.settings, [kind]: value } }, adjusts)
+      const trial = pack({ ...job, settings: { ...job.settings, [kind]: value } })
       if (!reduced(base, trial)) continue
       return { change: { kind, value }, from: base.sheetCount, to: trial.sheetCount, message: savingMessage(kind, value, base.sheetCount, trial.sheetCount) }
     }

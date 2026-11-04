@@ -2,12 +2,12 @@
 // 向きを「回転しない／回転してよい」にしたもの。見本は仕様書 6章の棚（4×8・端切り5・切り代10））
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from '../dimensions'
-import { shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { shelfJob } from '../fixtures/shelf'
 import type { Job, Part } from '../types'
 import { expandPieces, orientationsFor, piecesOf, type PieceShape } from './pieces'
 
 function expand(job: Job, frozen?: ReadonlyMap<string, number>) {
-  return expandPieces(job, computeDimensions(job, shelfAdjusts()), frozen)
+  return expandPieces(job, computeDimensions(job), frozen)
 }
 
 function addPart(job: Job, p: Partial<Part> & Pick<Part, 'id' | 'name'>) {
@@ -44,7 +44,7 @@ describe('expandPieces（部材 → 片の並び）', () => {
 
   it('小数の寸法の表記は小数第1位まで', () => {
     const job = shelfJob()
-    job.parts = [{ ...job.parts[0], expr: { W: '100 / 3', H: '200.25' }, quantity: 1 }]
+    job.parts = [{ ...job.parts[0], expr: { W: '33.33', H: '200.25' }, quantity: 1 }]
     expect(expand(job).runs[0].sizeLabel).toBe('43.3×210.3')
   })
 

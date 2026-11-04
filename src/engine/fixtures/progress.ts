@@ -1,6 +1,5 @@
 // 切り出しチェック（progress）のテストで使う手助け（見本の棚を計算して、i 枚目を固定する）
 import { computeDimensions } from '../dimensions'
-import { shelfAdjusts } from './shelf'
 import { packJob } from '../packing'
 import type { Job, PackingResult } from '../types'
 import { freezeSheet } from '../progress/frozen'
@@ -8,7 +7,7 @@ import { freezeSheet } from '../progress/frozen'
 export const NOW = new Date('2026-10-20T09:00:00.000Z')
 export const LATER = new Date('2026-10-20T10:00:00.000Z')
 
-export const dimsOf = (job: Job) => computeDimensions(job, shelfAdjusts())
+export const dimsOf = (job: Job) => computeDimensions(job)
 export const pack = (job: Job): PackingResult => packJob(job, dimsOf(job))
 
 /** 今の計算の i 枚目（0 から）を固定した1枚として足す。checked は partId の片を先頭から n 個（省略で空） */

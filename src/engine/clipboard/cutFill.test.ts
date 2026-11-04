@@ -52,9 +52,9 @@ const shelf = (id = 'job-a') =>
   jobOf(
     id,
     part('p0', '全体', '400', '1800', 0),
-    part('p1', '天板', '全体.W', '全体.H', 1),
-    part('p2', '側板', '全体.W', '700', 2),
-    part('p3', '棚板', '天板.W - 20', '天板.H - 40', 3),
+    part('p1', '天板', '400', '1800', 1),
+    part('p2', '側板', '400', '700', 2),
+    part('p3', '棚板', '380', '1760', 3),
   )
 
 describe('範囲（四角）', () => {
@@ -93,8 +93,8 @@ describe('範囲（四角）', () => {
   it('今の関数（コピー・貼り付け・クリア・行を削除）は四角でも呼べる', () => {
     const job = shelf()
     expect(clipOk(copyCells(job, R(1, 0, 2, 2))).cells).toEqual([
-      ['天板', '全体.W'],
-      ['側板', '全体.W'],
+      ['天板', '400'],
+      ['側板', '400'],
     ])
     const clip: CellClip = { rows: 1, cols: 1, cells: [['5']] }
     expect(table(ok(pasteCells(job, clip, columnRange(job, 3), ids())).job).map((r) => r[3])).toEqual([5, 5, 5, 5])
@@ -113,8 +113,8 @@ describe('切り取り', () => {
         rows: 2,
         cols: 2,
         cells: [
-          ['全体.W', '700'],
-          ['天板.W - 20', '天板.H - 40'],
+          ['400', '700'],
+          ['380', '1760'],
         ],
         cut: { jobId: 'job-a', range: R(2, 1, 2, 2) },
       },
@@ -133,9 +133,9 @@ describe('切り取り', () => {
     expect(r.pasted).toBe(3)
     expect(table(r.job)).toEqual([
       ['全体', '300', '400', 1],
-      ['天板', '全体.W', '全体.H', 1],
-      ['側板', '全体.W', '700', 2],
-      ['棚板', '天板.W - 20', '天板.H - 40', 3],
+      ['天板', '400', '1800', 1],
+      ['側板', '400', '700', 2],
+      ['棚板', '380', '1760', 3],
       ['背板', '', '', null],
     ])
     expect(r.cutClear).toBeNull()
@@ -159,7 +159,7 @@ describe('切り取り', () => {
     const dst = jobOf('job-b')
     const clip = clipOk(cutCells(src, R(3, 0, 1, 4)))
     const r = ok(pasteCells(dst, clip, [{ row: 0, col: 'name' }], ids()))
-    expect(table(r.job)).toEqual([['棚板', '天板.W - 20', '天板.H - 40', 3]])
+    expect(table(r.job)).toEqual([['棚板', '380', '1760', 3]])
     expect(r.cutClear).toEqual({ jobId: 'job-a', cells: rangeCells(R(3, 0, 1, 4)) })
     const cleared = clearCutSource(src, clip, r.cutClear!.cells)
     expect(cleared.parts.map((p) => p.name)).toEqual(['全体', '天板', '側板'])
@@ -168,10 +168,10 @@ describe('切り取り', () => {
   it('ほかの仕事に同じ名前があれば、番号を振って貼り、元は空にする（仕様書 18.3）', () => {
     const src = shelf('job-a')
     const dst = jobOf('job-b', part('x', '棚板', '1', '1', 1))
-    const clip = clipOk(cutCells(src, R(3, 0, 1, 2))) // 棚板・天板.W - 20
+    const clip = clipOk(cutCells(src, R(3, 0, 1, 2))) // 棚板・380
     const r = ok(pasteCells(dst, clip, [{ row: 1, col: 'name' }], ids()))
     expect(r.skipped).toEqual([])
-    expect(table(r.job)[1].slice(0, 2)).toEqual(['棚板1', '天板.W - 20'])
+    expect(table(r.job)[1].slice(0, 2)).toEqual(['棚板1', '380'])
     expect(r.cutClear).toEqual({ jobId: 'job-a', cells: [{ row: 3, col: 'name' }, { row: 3, col: 'W' }] })
   })
 
@@ -203,13 +203,13 @@ describe('切り取り', () => {
   it('元のセルを切り取ったあとに書き換えていたら、そのセルは空にしない', () => {
     const src = shelf('job-a')
     const clip = clipOk(cutCells(src, R(1, 1, 1, 2)))
-    src.parts[1] = { ...src.parts[1], expr: { W: '999', H: '全体.H' } }
+    src.parts[1] = { ...src.parts[1], expr: { W: '999', H: '1800' } }
     expect(table(clearCutSource(src, clip, rangeCells(R(1, 1, 1, 2))))[1]).toEqual(['天板', '999', '', 1])
   })
 
   it('1つも貼れなければ元は空にしない', () => {
     const job = shelf()
-    const clip = clipOk(cutCells(job, R(1, 1, 1, 1))) // 全体.W を
+    const clip = clipOk(cutCells(job, R(1, 0, 1, 1))) // 名前「天板」を
     const r = ok(pasteCells(job, clip, [{ row: 0, col: 'qty' }], ids())) // 枚数に
     expect(r.pasted).toBe(0)
     expect(r.job).toBe(job)
@@ -220,7 +220,7 @@ describe('切り取り', () => {
     const job = shelf()
     const clip = clipOk(copyCells(job, R(1, 1, 1, 1)))
     const r = ok(pasteCells(job, clip, [{ row: 3, col: 'W' }], ids()))
-    expect(table(r.job)[1]).toEqual(['天板', '全体.W', '全体.H', 1])
+    expect(table(r.job)[1]).toEqual(['天板', '400', '1800', 1])
     expect(r.cutClear).toBeNull()
   })
 })

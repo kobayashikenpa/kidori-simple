@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
+import { legacyShelfJob, shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
 import type { AppData } from '../engine/types'
-import { BROKEN_KEY_PREFIX, CURRENT_JOB_KEY, DATA_KEY, loadSaved, parseAppData, saveSaved, type KeyValueStorage } from './storage'
+import {
+  BEFORE_NUMBERS_KEY_PREFIX,
+  BROKEN_KEY_PREFIX,
+  CURRENT_JOB_KEY,
+  DATA_KEY,
+  loadSaved,
+  parseAppData,
+  saveSaved,
+  type KeyValueStorage,
+} from './storage'
 
 class MemoryStorage implements KeyValueStorage {
   map = new Map<string, string>()
@@ -26,7 +35,7 @@ const sample = (): AppData => ({ version: 1, jobs: [shelfJob()], adjusts: shelfA
 
 describe('キー', () => {
   it('すべて kidori-simple. で始まる', () => {
-    for (const k of [DATA_KEY, CURRENT_JOB_KEY, BROKEN_KEY_PREFIX]) expect(k.startsWith('kidori-simple.')).toBe(true)
+    for (const k of [DATA_KEY, CURRENT_JOB_KEY, BROKEN_KEY_PREFIX, BEFORE_NUMBERS_KEY_PREFIX]) expect(k.startsWith('kidori-simple.')).toBe(true)
     expect(DATA_KEY).toBe('kidori-simple.data.v1')
     expect(CURRENT_JOB_KEY).toBe('kidori-simple.currentJobId')
   })
@@ -78,9 +87,12 @@ describe('保存と読み込み', () => {
     st.setItem(DATA_KEY, v1)
     const r = loadSaved(st, ids(), NOW)
     expect(r.status).toBe('ok')
-    // 第1.1版までの「コピーした部材」（clipboard）は読んで捨て、コピーしたセルは無し（第1.2版）。履歴は空（第2.1版）
-    const { clipboard: _old, ...rest } = JSON.parse(v1) as { jobs: Record<string, unknown>[] } & Record<string, unknown>
+    // 第1.1版までの「コピーした部材」（clipboard）は読んで捨て、コピーしたセルは無し（第1.2版）。履歴は空（第2.1版）。
+    // 式（全体.W・全体.H）は仕上がり寸法の数字に置き換える（第2.2版。仕様書 26.4）
+    const { clipboard: _old, ...rest } = JSON.parse(v1) as { jobs: { parts: { expr: unknown }[] }[] } & Record<string, unknown>
+    rest.jobs[0].parts[1].expr = { W: '400', H: '1800' }
     expect(r.data).toEqual({ ...rest, jobs: rest.jobs.map((j) => ({ ...j, history: [] })), cellClip: null, adjustClip: null })
+    expect(r.numbering).toEqual({ replaced: true, cleared: [] })
     expect('clipboard' in r.data).toBe(false)
   })
 
@@ -155,7 +167,7 @@ describe('保存と読み込み', () => {
 
   it('コピーしたセル（第1.2版）を保存して読み戻せる。形が違うコピーは捨てて、仕事は読める', () => {
     const data = sample()
-    data.cellClip = { rows: 2, cols: 2, cells: [['棚板', '天板.W - 20'], ['', '3']] }
+    data.cellClip = { rows: 2, cols: 2, cells: [['棚板', '380'], ['', '3']] }
     const st = new MemoryStorage()
     saveSaved(st, data, null)
     expect(loadSaved(st, ids(), NOW).data).toEqual(data)
@@ -173,7 +185,7 @@ describe('保存と読み込み', () => {
     const st = new MemoryStorage()
     saveSaved(st, data, null)
     expect(loadSaved(st, ids(), NOW).data).toEqual(data)
-    const v12 = { rows: 1, cols: 1, cells: [['天板.W']] }
+    const v12 = { rows: 1, cols: 1, cells: [['400']] }
     st.setItem(DATA_KEY, JSON.stringify({ ...data, cellClip: v12 }))
     expect(loadSaved(st, ids(), NOW).data.cellClip).toEqual(v12)
   })
@@ -288,5 +300,102 @@ describe('壊れた保存データ', () => {
 
   it('同じ id の仕事が2つあれば読めないとする', () => {
     expect(parseAppData({ ...sample(), jobs: [shelfJob(), shelfJob()] })).toBeNull()
+  })
+})
+
+describe('前のデータの式を数字に置き換える（第2.2版。仕様書 26.4）', () => {
+  /** 第2.1版の保存データ（見本の棚が式・調整寸法の一覧つき） */
+  const legacy = () => ({ ...sample(), jobs: [legacyShelfJob()] })
+
+  it('開いたときに式を仕上がり寸法の数字にし、置き換えたことを返す（エラーで空にしたものは無し）', () => {
+    const st = new MemoryStorage()
+    st.setItem(DATA_KEY, JSON.stringify(legacy()))
+    st.setItem(CURRENT_JOB_KEY, 'job-shelf')
+    const r = loadSaved(st, ids(), NOW)
+    expect(r.status).toBe('ok')
+    expect(r.data.jobs[0].parts).toEqual(shelfJob().parts)
+    expect(r.numbering).toEqual({ replaced: true, cleared: [] })
+    expect(r.currentJobId).toBe('job-shelf')
+    expect(r.canSave).toBe(true)
+  })
+
+  it('置き換える前の保存データを控えに1つ残し、置き換えたデータを保存し直す（次に開いたときは知らせない）', () => {
+    const st = new MemoryStorage()
+    const raw = JSON.stringify(legacy())
+    st.setItem(DATA_KEY, raw)
+    loadSaved(st, ids(), NOW)
+    const backups = [...st.map.keys()].filter((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))
+    expect(backups).toEqual([`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}`])
+    expect(st.getItem(backups[0])).toBe(raw)
+    expect(JSON.parse(st.getItem(DATA_KEY)!).jobs[0].parts).toEqual(shelfJob().parts)
+    const again = loadSaved(st, ids(), NOW)
+    expect(again.numbering).toEqual({ replaced: false, cleared: [] })
+    expect([...st.map.keys()].filter((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))).toHaveLength(1)
+  })
+
+  it('同じ時刻の控えがあっても上書きしない', () => {
+    const st = new MemoryStorage()
+    st.setItem(`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}`, '前の控え')
+    st.setItem(DATA_KEY, JSON.stringify(legacy()))
+    loadSaved(st, ids(), NOW)
+    expect(st.getItem(`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}`)).toBe('前の控え')
+    expect(st.getItem(`${BEFORE_NUMBERS_KEY_PREFIX}.${NOW.toISOString()}.1`)).not.toBeNull()
+  })
+
+  it('控えに残せなければ、置き換えた中身で始めるが、元のデータは書き換えず このあと保存しない', () => {
+    const st = new MemoryStorage()
+    const raw = JSON.stringify(legacy())
+    st.setItem(DATA_KEY, raw)
+    st.failWrite = true
+    const r = loadSaved(st, ids(), NOW)
+    expect(r.status).toBe('ok')
+    expect(r.data.jobs[0].parts).toEqual(shelfJob().parts)
+    expect(r.canSave).toBe(false)
+    expect(r.message).toMatch(/控えを残せなかった/)
+    expect(st.getItem(DATA_KEY)).toBe(raw)
+  })
+
+  it('エラーの式は空にして、仕事名・部材名・W/H を返す。履歴の中も置き換える', () => {
+    const data = legacy()
+    data.jobs[0].parts.push({ id: 'p5', name: '扉', expr: { W: '地板.W', H: '600' }, quantity: 1, rotatable: false, finishedDone: false })
+    data.jobs[0].history = [
+      { id: 'h1', savedAt: 't', memo: 'メモ', settings: data.jobs[0].settings, parts: legacyShelfJob().parts.map(({ id: _id, ...p }) => p), sheetCount: 2, yieldRate: 0.5 },
+    ]
+    const st = new MemoryStorage()
+    st.setItem(DATA_KEY, JSON.stringify(data))
+    const r = loadSaved(st, ids(), NOW)
+    expect(r.data.jobs[0].parts[4].expr).toEqual({ W: '', H: '600' })
+    expect(r.data.jobs[0].history[0].parts.map((p) => p.expr)).toEqual(shelfJob().parts.map((p) => p.expr))
+    expect(r.numbering).toEqual({ replaced: true, cleared: [{ jobId: 'job-shelf', jobName: '棚', partName: '扉', axis: 'W' }] })
+  })
+
+  it('調整寸法は保存データの中の一覧で計算する（メラミン2 なら棚板 W は 378）', () => {
+    const data = { ...legacy(), adjusts: [{ id: 'adjust-melamine', name: 'メラミン', value: 2 }] }
+    const st = new MemoryStorage()
+    st.setItem(DATA_KEY, JSON.stringify(data))
+    expect(loadSaved(st, ids(), NOW).data.jobs[0].parts[3].expr.W).toBe('378')
+  })
+
+  it('式の入ったアプリ内のコピー（セル）は捨てる。数字・名前だけのコピーは残す', () => {
+    const st = new MemoryStorage()
+    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), cellClip: { rows: 1, cols: 2, cells: [['棚板', '天板.W - 20']] } }))
+    expect(loadSaved(st, ids(), NOW).data.cellClip).toBeNull()
+    const keep = { rows: 1, cols: 2, cells: [['棚板', '379']] }
+    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), cellClip: keep }))
+    expect(loadSaved(st, ids(), NOW).data.cellClip).toEqual(keep)
+  })
+
+  it('式が無い保存データは置き換えず、控えも作らず、書き直さない', () => {
+    const st = new MemoryStorage()
+    const raw = JSON.stringify(sample())
+    st.setItem(DATA_KEY, raw)
+    const r = loadSaved(st, ids(), NOW)
+    expect(r.numbering).toEqual({ replaced: false, cleared: [] })
+    expect([...st.map.keys()].some((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))).toBe(false)
+    expect(st.getItem(DATA_KEY)).toBe(raw)
+  })
+
+  it('parseAppData も置き換えたデータを返す', () => {
+    expect(parseAppData(JSON.parse(JSON.stringify(legacy())))?.jobs[0].parts).toEqual(shelfJob().parts)
   })
 })

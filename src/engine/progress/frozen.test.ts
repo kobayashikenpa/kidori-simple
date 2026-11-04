@@ -79,15 +79,16 @@ describe('frozenSheetViews（部材が変わっています）', () => {
     expect(v.sheet).toBe(job.frozenSheets[0])
   })
 
-  it('固定したあと部材の寸法を変えると size（参照している棚板も変わる）。固定は外れない', () => {
-    const job = withPart(freezeAt(shelfJob(), 0), 'part-zentai', { expr: { W: '450', H: '1800' } })
+  it('固定したあと部材の寸法を変えると size（変えた部材だけ。第2.2版から部材どうしの参照は無い）。固定は外れない', () => {
+    const job = withPart(withPart(freezeAt(shelfJob(), 0), 'part-tenita', { expr: { W: '450', H: '1800' } }), 'part-tanaita', { expr: { W: '379', H: '1700' } })
     expect(drift(job)).toEqual([
       [
         ['天板', 'size'],
-        ['側板', 'size'],
         ['棚板', 'size'],
       ],
     ])
+    // 枚数0 の全体を変えても、固定した1枚の部材は変わらない
+    expect(drift(withPart(freezeAt(shelfJob(), 0), 'part-zentai', { expr: { W: '450', H: '1800' } }))).toEqual([[]])
     expect(job.frozenSheets).toHaveLength(1)
   })
 
@@ -98,7 +99,7 @@ describe('frozenSheetViews（部材が変わっています）', () => {
   })
 
   it('0.04mm だけの違いは同じ寸法（小数第1位で比べる）', () => {
-    const job = withPart(freezeAt(shelfJob(), 0), 'part-gawaita', { expr: { W: '全体.W', H: '700.04' } })
+    const job = withPart(freezeAt(shelfJob(), 0), 'part-gawaita', { expr: { W: '400', H: '700.04' } })
     expect(drift(job)).toEqual([[]])
   })
 
@@ -112,17 +113,12 @@ describe('frozenSheetViews（部材が変わっています）', () => {
   it('部材を消すと removed（写しの名前）。名前を変えただけなら変わっていない', () => {
     const job = freezeAt(shelfJob(), 0)
     const removed = { ...job, parts: job.parts.filter((p) => p.id !== 'part-tenita') }
-    // 天板を消すと、天板を参照する棚板は寸法のエラーになる
-    expect(drift(removed)).toEqual([
-      [
-        ['天板', 'removed'],
-        ['棚板', 'size'],
-      ],
-    ])
+    // 天板を消しても、ほかの部材は変わらない（第2.2版から部材どうしの参照は無い）
+    expect(drift(removed)).toEqual([[['天板', 'removed']]])
     expect(drift(withPart(job, 'part-gawaita', { name: '側板L' }))).toEqual([[]])
   })
 
-  it('寸法の式がエラーになったら size', () => {
+  it('寸法がエラー（数字でない）になったら size', () => {
     const job = withPart(freezeAt(shelfJob(), 1), 'part-tanaita', { expr: { W: '(', H: '100' } })
     expect(drift(job)).toEqual([[['棚板', 'size']]])
   })

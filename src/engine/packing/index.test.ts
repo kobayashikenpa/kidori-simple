@@ -3,14 +3,14 @@
 import { describe, expect, it } from 'vitest'
 import { createJob } from '../defaults'
 import { computeDimensions } from '../dimensions'
-import { shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { shelfJob } from '../fixtures/shelf'
 import type { CutMode, Job, Part } from '../types'
 import { MIN_SCRAP, packJob } from './index'
 
 const pct = (r: number) => Math.round(r * 1000) / 10
 
 function run(job: Job) {
-  return packJob(job, computeDimensions(job, shelfAdjusts()))
+  return packJob(job, computeDimensions(job))
 }
 
 function withMode(mode: CutMode, job: Job = shelfJob()): Job {
@@ -280,12 +280,12 @@ describe('packJob：入らない部材・エラーの部材', () => {
     expect(names(r).flat()).not.toContain('エラー')
   })
 
-  it('参照している部材がエラーなら、参照している部材も外す', () => {
+  it('寸法が 0 の部材だけ外し、ほかの部材は並べる（第2.2版から部材どうしの参照は無い）', () => {
     const job = shelfJob()
-    job.parts[0].expr.W = '0'
+    job.parts[1].expr.W = '0'
     const r = run(job)
-    expect(r.skipped.map((s) => s.name)).toEqual(['天板', '側板', '棚板'])
-    expect(r.sheetCount).toBe(0)
+    expect(r.skipped.map((s) => s.name)).toEqual(['天板'])
+    expect(r.sheets.flatMap((s) => s.placements).map((p) => p.name).sort()).toEqual(['側板', '側板', '棚板', '棚板', '棚板'])
   })
 
   it('部材が1枚もなければ 0枚・歩留まり 0・縦切り優先', () => {

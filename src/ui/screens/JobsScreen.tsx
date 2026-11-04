@@ -173,7 +173,7 @@ export function JobsScreen({ onOpened }: { onOpened: () => void }) {
     if (!r || !state.canSave) return
     try {
       const out = importTransfer(data, r.file, newId, new Date())
-      const d = dispatch({ type: 'replaceData', data: out.data })
+      const d = dispatch({ type: 'replaceData', data: out.data, numbering: out.numbering })
       setTransferMsg(d.ok ? { ok: true, text: out.message } : { ok: false, text: d.message })
     } catch {
       setTransferMsg({ ok: false, text: READ_FAILED })

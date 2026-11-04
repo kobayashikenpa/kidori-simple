@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from '../engine/dimensions'
 import { withHistory } from '../engine/fixtures/history'
-import { shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
+import { shelfJob } from '../engine/fixtures/shelf'
 import { packJob } from '../engine/packing'
 import type { CutMode, Job } from '../engine/types'
 import { finalCutLabel, historyMeta, historyTitle, pct, pieceColorClass, PIECE_COLORS, scrapLabel } from './kidoriView'
@@ -38,7 +38,7 @@ describe('最終縦カット（仕様書 25.3）', () => {
   const sheets = (mode: CutMode) => {
     const job: Job = shelfJob()
     job.settings.cutMode = mode
-    return packJob(job, computeDimensions(job, shelfAdjusts())).sheets
+    return packJob(job, computeDimensions(job)).sheets
   }
   it('見本・縦切り優先：1枚目は左に余りが無いので出さない、2枚目は「最終縦カット 右から 786mm」', () => {
     expect(sheets('vertical').map(finalCutLabel)).toEqual([null, '最終縦カット 右から 786mm'])

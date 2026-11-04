@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MELAMINE_ID, SHEET_ID, shelfJob } from '../fixtures/shelf'
+import { MELAMINE_ID, SHEET_ID, legacyShelfJob as shelfJob } from '../fixtures/shelf'
 import { adjustIdsInExpr, adjustUsages, adjustUsagesOf, partsUsingAdjust, partsUsingAdjusts, remapAdjustIds } from './usages'
 
 describe('adjustIdsInExpr（式に出てくる調整寸法の id）', () => {

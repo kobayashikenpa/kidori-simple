@@ -26,7 +26,7 @@ function job(parts: Part[], cutMode: CutMode = 'vertical'): Job {
 }
 
 const run = (j: Job, orientFirst?: OrientFirst) =>
-  packJob(j, computeDimensions(j, []), orientFirst === undefined ? {} : { orientFirst })
+  packJob(j, computeDimensions(j), orientFirst === undefined ? {} : { orientFirst })
 
 /** オーナーの例（2026-10-25）：甲板 600×800 ×2・保立 397×594 ×2（回転してよい）・天地板 460×800 ×2・背板 460×812 */
 const ownerJob = () =>

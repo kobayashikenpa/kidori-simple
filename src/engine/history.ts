@@ -33,7 +33,7 @@ export function copyHistory(history: readonly HistoryEntry[]): HistoryEntry[] {
 
 /**
  * 今の仕事から履歴の1件を作る（写し。あとで仕事を変えても変わらない）。
- * result は画面に出ている結果（packJob(job, computeDimensions(job, 使える調整寸法))）。必要な枚数・歩留まりはそこから写す。
+ * result は画面に出ている結果（packJob(job, computeDimensions(job))）。必要な枚数・歩留まりはそこから写す。
  * メモの前後の空白は外す
  */
 export function historyEntry(

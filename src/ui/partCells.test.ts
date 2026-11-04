@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { computeDimensions } from '../engine/dimensions'
-import { shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
+import { legacyShelfJob as shelfJob, shelfAdjusts } from '../engine/fixtures/shelf'
+import { legacyComputeDimensions } from '../engine/migrate/legacyDimensions'
 import type { Axis } from '../engine/types'
 import { dimCell, isNumberOnly } from './partCells'
 import type { PartsTab } from './partsTab'
@@ -9,7 +9,8 @@ function cellOf(name: string, axis: Axis, tab: PartsTab, edit?: (job: ReturnType
   const job = shelfJob()
   edit?.(job)
   const adjusts = shelfAdjusts()
-  const dims = computeDimensions(job, adjusts)
+  // 式の表示は U-27 でなくす。それまでは前の版の式の見本で確かめる
+  const dims = legacyComputeDimensions(job, adjusts)
   const part = job.parts.find((p) => p.name === name)!
   return dimCell(part, dims.parts.find((d) => d.partId === part.id), axis, tab, adjusts)
 }

@@ -2,12 +2,10 @@
 // 部材ごとの切り代の上書きのテストを外し、板1種類（サブロク 910×1820）の形に直したもの。仕様書 6章（19.1 の見本）の棚の例を足した
 import { describe, expect, it } from 'vitest'
 import { createJob } from '../defaults'
-import { MELAMINE_ID, shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { shelfJob } from '../fixtures/shelf'
 import { freezeAt } from '../fixtures/progress'
 import type { Job, Part, Settings } from '../types'
 import { findSavingHint, savingMessage, smallerSteps } from './saving'
-
-const ADJ = shelfAdjusts()
 
 function part(id: string, W: string, H: string, quantity: number, rotatable = false): Part {
   return { id, name: id, expr: { W, H }, quantity, rotatable, finishedDone: false }
@@ -24,7 +22,7 @@ function jobWith(w: number, quantity: number, settings: Partial<Settings> = {}):
   return job
 }
 
-const hint = (job: Job) => findSavingHint(job, ADJ)
+const hint = (job: Job) => findSavingHint(job)
 
 describe('smallerSteps（試す値）', () => {
   it('今の値より小さい整数を 1 まで、最後に 0.5。0 は試さない', () => {
@@ -175,14 +173,14 @@ describe('findSavingHint（板を減らせるときのお知らせ）', () => {
 })
 
 describe('仕様書 6章（19.1 の見本）の棚とお知らせ', () => {
-  /** 19.1 の見本（全体なし）：天板 400×1800 ×1、側板 天板.W×700 ×2、棚板 (天板.W − 20 − メラミン1)×(天板.H − 20 × 2) ×3。4×8 */
+  /** 19.1 の見本（全体なし）：天板 400×1800 ×1、側板 400×700 ×2、棚板 379×1760 ×3（第2.2版で数字だけに。前の版の式の値と同じ）。4×8 */
   function sampleJob(settings: Partial<Settings> = {}): Job {
     const job = createJob({ id: 'job-sample', name: '見本 棚', now: '2026-10-23T00:00:00.000Z' })
     job.settings = { ...job.settings, ...settings }
     job.parts = [
       part('天板', '400', '1800', 1),
-      part('側板', '天板.W', '700', 2),
-      part('棚板', `天板.W - 20 - {n:${MELAMINE_ID}}`, '天板.H - 20 × 2', 3),
+      part('側板', '400', '700', 2),
+      part('棚板', '379', '1760', 3),
     ]
     return job
   }

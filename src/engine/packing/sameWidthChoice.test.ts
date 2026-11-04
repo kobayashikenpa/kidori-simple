@@ -20,7 +20,7 @@ function job(parts: Part[], cutMode: CutMode = 'vertical'): Job {
 }
 
 const run = (j: Job, sameWidthFirst?: boolean) =>
-  packJob(j, computeDimensions(j, []), sameWidthFirst === undefined ? {} : { sameWidthFirst })
+  packJob(j, computeDimensions(j), sameWidthFirst === undefined ? {} : { sameWidthFirst })
 
 /** 1枚目の片ごとの x（右から詰めた帯の位置） */
 const xs = (r: PackingResult) => Object.fromEntries(r.sheets[0].placements.map((p) => [p.pieceId, p.x]))

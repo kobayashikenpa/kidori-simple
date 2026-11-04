@@ -188,7 +188,7 @@ export function setAllRotatable(job: Job, rotatable: boolean): OpResult {
 }
 
 /**
- * 部材を並べ替える（第2.0版。仕様書 24.1。engine の sortParts）。dims は computeDimensions(job, adjusts) の結果。
+ * 部材を並べ替える（第2.0版。仕様書 24.1。engine の sortParts）。dims は computeDimensions(job) の結果。
  * 並びが変わらなければ同じ仕事を返す（updatedAt を付けない）
  */
 export function sortJobParts(job: Job, dims: DimensionResult, key: SortKey, order: SortOrder): OpResult {

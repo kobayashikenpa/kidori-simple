@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from './dimensions'
 import { freezeAt } from './fixtures/progress'
-import { MELAMINE_ID, shelfAdjusts, shelfJob } from './fixtures/shelf'
+import { shelfJob } from './fixtures/shelf'
 import { addHistory, copyHistory, historyEntry, HISTORY_LIMIT, removeHistory, restoreHistory, setHistoryMemo } from './history'
 import { packJob } from './packing'
 import type { HistoryEntry, Job } from './types'
@@ -20,7 +20,7 @@ function counter(start = 0) {
   return (prefix: string) => `${prefix}-${++n}`
 }
 
-const resultOf = (job: Job) => packJob(job, computeDimensions(job, shelfAdjusts()))
+const resultOf = (job: Job) => packJob(job, computeDimensions(job))
 
 /** 見本の棚の今の内容を履歴に残した仕事 */
 function saved(job: Job = shelfJob(), id = 'h-1', memo = '初めの案', now = T0): Job {
@@ -28,7 +28,7 @@ function saved(job: Job = shelfJob(), id = 'h-1', memo = '初めの案', now = T
 }
 
 describe('historyEntry（残す中身）', () => {
-  it('設定・部材（名前・式のまま・枚数・回転・仕上がりのチェック）・必要な枚数・歩留まり・日時・メモが入る。調整寸法・部材の id は入らない', () => {
+  it('設定・部材（名前・W・H・枚数・回転・仕上がりのチェック）・必要な枚数・歩留まり・日時・メモが入る。部材の id は入らない', () => {
     const job = shelfJob()
     job.settings = { ...job.settings, kerf: 4, cutMode: 'horizontal' }
     job.parts[1] = { ...job.parts[1], rotatable: true, finishedDone: true }
@@ -41,9 +41,9 @@ describe('historyEntry（残す中身）', () => {
       settings: job.settings,
       parts: [
         { name: '全体', expr: { W: '400', H: '1800' }, quantity: 0, rotatable: false, finishedDone: false },
-        { name: '天板', expr: { W: '全体.W', H: '全体.H' }, quantity: 1, rotatable: true, finishedDone: true },
-        { name: '側板', expr: { W: '全体.W', H: '700' }, quantity: 2, rotatable: false, finishedDone: false },
-        { name: '棚板', expr: { W: `天板.W - 20 - {n:${MELAMINE_ID}}`, H: '天板.H - 20 × 2' }, quantity: 3, rotatable: false, finishedDone: false },
+        { name: '天板', expr: { W: '400', H: '1800' }, quantity: 1, rotatable: true, finishedDone: true },
+        { name: '側板', expr: { W: '400', H: '700' }, quantity: 2, rotatable: false, finishedDone: false },
+        { name: '棚板', expr: { W: '379', H: '1760' }, quantity: 3, rotatable: false, finishedDone: false },
       ],
       sheetCount: r.sheetCount,
       yieldRate: r.yieldRate,
@@ -134,7 +134,7 @@ describe('restoreHistory（この内容に戻す）', () => {
     return freezeAt(next, 0, { partId: 'part-gawaita', n: 1 })
   }
 
-  it('設定と部材を履歴の内容に置き換える（式は式のまま。回転・仕上がりのチェックも戻る）', () => {
+  it('設定と部材を履歴の内容に置き換える（W・H・回転・仕上がりのチェックも戻る）', () => {
     const job = changed()
     const r = okJob(restoreHistory(job, 'h-1', counter()))
     const e = job.history[0]

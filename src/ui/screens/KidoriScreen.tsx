@@ -59,7 +59,7 @@ const DRIFT_REASON: Record<FrozenSheetView['drift'][number]['reason'], string> =
 export function KidoriScreen() {
   const { job, data, dispatch } = useJobStore()
   const adjusts = usableAdjusts(data.adjusts)
-  // 部材・設定・調整寸法・固定した1枚が変わったときだけ計算する。
+  // 部材・設定・固定した1枚が変わったときだけ計算する。
   // 履歴に残す・メモを直す・削除でも仕事は新しくなるので、計算に使わない 履歴・更新日時 を外したものを条件にする（SavingHint と同じ）
   const { id, name, createdAt, parts, settings, frozenSheets } = job ?? {}
   const calcJob = useMemo<Job | null>(
@@ -71,7 +71,7 @@ export function KidoriScreen() {
   )
   const calc = useMemo(() => {
     if (!calcJob) return null
-    const dims = computeDimensions(calcJob, adjusts)
+    const dims = computeDimensions(calcJob)
     return {
       dims,
       result: packJob(calcJob, dims),
@@ -79,7 +79,7 @@ export function KidoriScreen() {
       views: frozenSheetViews(calcJob, dims),
       progress: partCutProgress(calcJob),
     }
-  }, [calcJob, adjusts])
+  }, [calcJob])
   const [openFinished, setOpenFinished] = useState(false)
   // チェックで失敗したときの知らせ（その1枚の中に出す）
   const [checkError, setCheckError] = useState<{ key: string; message: string } | null>(null)

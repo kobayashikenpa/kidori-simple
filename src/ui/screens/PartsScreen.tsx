@@ -23,7 +23,7 @@ export function PartsScreen() {
   const [tab, setTabState] = useState<PartsTab>(() => loadPartsTab(browserStorage()))
   const [error, setError] = useState<string | null>(null)
   const adjusts = usableAdjusts(data.adjusts)
-  const dims = useMemo(() => (job ? computeDimensions(job, adjusts) : null), [job, adjusts])
+  const dims = useMemo(() => (job ? computeDimensions(job) : null), [job])
   const progress = useMemo(() => (job ? partCutProgress(job) : []), [job])
   if (!job || !dims) return null
 

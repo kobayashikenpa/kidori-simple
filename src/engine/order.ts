@@ -28,7 +28,7 @@ function sortValue(part: Part, dims: DimensionResult, key: SortKey): number | st
 }
 
 /**
- * 部材を並べ替える（新しい配列を返す。元は書き換えない）。dims は computeDimensions(job, adjusts) の結果（W・H の仕上がり寸法に使う）。
+ * 部材を並べ替える（新しい配列を返す。元は書き換えない）。dims は computeDimensions(job) の結果（W・H の仕上がり寸法に使う）。
  * 空・エラーの部材は一番下（その中は今の並び）。値が同じ部材は今の並びのまま
  */
 export function sortParts(parts: readonly Part[], dims: DimensionResult, key: SortKey, order: SortOrder): Part[] {

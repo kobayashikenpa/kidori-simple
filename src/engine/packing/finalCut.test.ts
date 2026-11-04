@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { createJob } from '../defaults'
 import { computeDimensions } from '../dimensions'
 import { freezeAt, pack } from '../fixtures/progress'
-import { shelfAdjusts, shelfJob } from '../fixtures/shelf'
+import { shelfJob } from '../fixtures/shelf'
 import type { CutMode, Job, Part, Sheet, SheetLayout } from '../types'
 import { finalCutFromRight } from './finalCut'
 import { packJob } from './index'
 
 function run(job: Job) {
-  return packJob(job, computeDimensions(job, shelfAdjusts()))
+  return packJob(job, computeDimensions(job))
 }
 
 function withMode(mode: CutMode, job: Job = shelfJob()): Job {

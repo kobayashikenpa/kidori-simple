@@ -27,8 +27,8 @@ import {
   type AdjustRenamed,
   type AdjustSelection,
 } from '../engine/clipboard/adjustCells'
-import { usableAdjusts } from '../engine/adjusts'
 import { duplicatePart } from '../engine/clipboard/copy'
+import { mergeNumbering, NO_NUMBERING, type NumberingReport } from '../engine/migrate/numbers'
 import { addHistory, historyEntry, removeHistory, restoreHistory, setHistoryMemo } from '../engine/history'
 import { packJob } from '../engine/packing'
 import { computeDimensions } from '../engine/dimensions'
@@ -68,6 +68,12 @@ export interface StoreState {
   loadError: string | null
   /** 保存してよいか（壊れたデータを守るため、保存を止めることがある） */
   canSave: boolean
+  /**
+   * 前の版の式を数字に置き換えたときの知らせ（第2.2版。仕様書 26.4）。まだ知らせていないものだけ持つ（保存しない）。
+   * 開いたときの置き換え（storage の loadSaved）と、ファイルの取り込み（replaceData の numbering）で入り、
+   * 画面が知らせを閉じたら dismissNumbering で消す（1度だけ知らせる）。文は engine/migrate/numbers の numberingMessage
+   */
+  numbering: NumberingReport
 }
 
 /** 操作の中で使う id の作り方と今の時刻 */
@@ -122,10 +128,7 @@ export type StoreAction =
   | { type: 'renameJob'; jobId: string; name: string }
   /** 仕事をコピーする（設定を引き継ぐ）。開かない */
   | { type: 'copyJob'; jobId: string }
-  /**
-   * 見本（6章の棚「見本 棚」）を仕事の一覧に足す（仕様書 16.7）。開いている仕事は変えない。
-   * 調整寸法にメラミン1 が無ければ足す
-   */
+  /** 見本（6章の棚「見本 棚」。数字だけ）を仕事の一覧に足す（仕様書 16.7）。開いている仕事は変えない */
   | { type: 'addSample' }
   /** 仕事を消す。開いていた仕事なら、何も開いていない状態にする */
   | { type: 'deleteJob'; jobId: string }
@@ -197,11 +200,14 @@ export type StoreAction =
   | AdjustTableAction
   /**
    * 保存データを丸ごと置き換える（ファイルから取り込んだあとの data を入れる。engine/transfer の importTransfer）。
-   * 開いている仕事は変えない（新しいデータに無ければ閉じる）。updatedAt は付けない
+   * 開いている仕事は変えない（新しいデータに無ければ閉じる）。updatedAt は付けない。
+   * numbering（importTransfer の numbering）を渡すと、式を数字に置き換えた知らせに足す（第2.2版）
    */
-  | { type: 'replaceData'; data: AppData }
+  | { type: 'replaceData'; data: AppData; numbering?: NumberingReport }
   /** 読み込みの知らせを閉じる */
   | { type: 'dismissLoadError' }
+  /** 式を数字に置き換えた知らせを閉じる（第2.2版。もう出さない） */
+  | { type: 'dismissNumbering' }
 
 /** 貼り付けの結果（「◯つのセルに貼りました（貼れなかったもの ◯つ）」） */
 export interface PasteSummary {
@@ -285,7 +291,7 @@ export function adjustTableOutcome(data: Pick<AppData, 'adjusts' | 'adjustClip'>
 
 /** 読み込みの結果から最初の状態を作る */
 export function initialState(load: LoadResult): StoreState {
-  return { data: load.data, currentJobId: load.currentJobId, loadError: load.message ?? null, canSave: load.canSave }
+  return { data: load.data, currentJobId: load.currentJobId, loadError: load.message ?? null, canSave: load.canSave, numbering: load.numbering }
 }
 
 /** 開いている仕事（無ければ null） */
@@ -337,8 +343,8 @@ export function reduce(state: StoreState, action: StoreAction, env: Env): Reduce
       return done({ ...state, data: { ...state.data, jobs: [...state.data.jobs, job] } }, job.id)
     }
     case 'addSample': {
-      const r = sampleJob(state.data.adjusts, env.now, env.newId)
-      return done({ ...state, data: { ...state.data, jobs: [...state.data.jobs, r.job], adjusts: r.adjusts } }, r.job.id)
+      const job = sampleJob(env.now, env.newId)
+      return done({ ...state, data: { ...state.data, jobs: [...state.data.jobs, job] } }, job.id)
     }
     case 'deleteJob': {
       if (!state.data.jobs.some((j) => j.id === action.jobId)) return fail('仕事が見つかりません')
@@ -365,7 +371,7 @@ export function reduce(state: StoreState, action: StoreAction, env: Env): Reduce
       return onJob(state, action.jobId, env, (j) => setAllRotatable(j, action.rotatable))
     case 'sortParts':
       return onJob(state, action.jobId, env, (j) =>
-        sortJobParts(j, computeDimensions(j, usableAdjusts(state.data.adjusts)), action.key, action.order),
+        sortJobParts(j, computeDimensions(j), action.key, action.order),
       )
     case 'moveParts':
       return onJob(state, action.jobId, env, (j) => moveJobParts(j, action.from, action.count, action.to))
@@ -444,7 +450,7 @@ export function reduce(state: StoreState, action: StoreAction, env: Env): Reduce
         state,
         action.jobId,
         env,
-        (j) => addHistory(j, historyEntry(j, packJob(j, computeDimensions(j, usableAdjusts(state.data.adjusts))), { id, memo: action.memo, now: env.now })),
+        (j) => addHistory(j, historyEntry(j, packJob(j, computeDimensions(j)), { id, memo: action.memo, now: env.now })),
         id,
       )
     }
@@ -483,9 +489,12 @@ export function reduce(state: StoreState, action: StoreAction, env: Env): Reduce
     }
     case 'replaceData': {
       const keep = state.currentJobId !== null && action.data.jobs.some((j) => j.id === state.currentJobId)
-      return done({ ...state, data: action.data, currentJobId: keep ? state.currentJobId : null })
+      const numbering = action.numbering ? mergeNumbering(state.numbering, action.numbering) : state.numbering
+      return done({ ...state, data: action.data, currentJobId: keep ? state.currentJobId : null, numbering })
     }
     case 'dismissLoadError':
       return done({ ...state, loadError: null })
+    case 'dismissNumbering':
+      return state.numbering.replaced ? done({ ...state, numbering: NO_NUMBERING }) : done(state)
   }
 }

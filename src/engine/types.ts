@@ -55,11 +55,11 @@ export const DEFAULT_SETTINGS: Readonly<Omit<Settings, 'sheet'>> = {
 }
 
 /**
- * 調整寸法（アプリ全体で1つの一覧）。逃げ・ほぞ・メラミン・シートなど。kidori の Nige と同じ形。
- * 表示名は「名前＋寸法」（adjustName。例：逃げ1、ほぞ15）。表示名が重なるものは登録しない（adjustNameKey で判定）
+ * 前の版（第2.1版まで）の調整寸法（アプリ全体で1つの一覧だった）。kidori の Nige と同じ形。
+ * 第2.2版（仕様書 26.2）で調整寸法はなくした。前のデータの式を数字に置き換えるとき（engine/migrate）と、その式の計算（engine/formula）だけで使う
  */
 export interface Adjust {
-  /** アプリの中で重複しない。式からはこの id で参照する（{n:id}） */
+  /** 式からはこの id で参照していた（{n:id}） */
   id: string
   /** 名前（例：逃げ、ほぞ）。空でない */
   name: string
@@ -71,11 +71,14 @@ export interface Adjust {
 export interface Part {
   id: string
   /**
-   * 仕事の中で重複不可（全角・半角の違いは同じとみなす）。式の参照に使う。
-   * 空でもよい（第1.1版）。空どうしは重ならず、画面では「#3」（行番号）と出す（parts.ts の partLabel）。空の部材は式から参照できない
+   * 名前。空でもよい（第1.1版。画面では「#3」＝行番号。parts.ts の partLabel）。
+   * 第2.2版（仕様書 26.3）から同じ名前の部材があってもよい（式で参照しなくなったため）
    */
   name: string
-  /** 仕上がり寸法の入力（数値または式の文字列） */
+  /**
+   * 仕上がり寸法の入力（W・H）。第2.2版（仕様書 26.1）から **数字だけ**：空か、半角の数字（小数可。キーで入れている途中の「12.」も）。
+   * 保存の形は前の版と同じ文字のまま（前の版の式は読み込むときに数字に置き換える。engine/migrate/numbers.ts）。読み方は engine/size.ts
+   */
   expr: Record<Axis, string>
   /** 枚数（0 は切り出さない寸法だけの行。null は枚数が空＝寸法は計算するが、木取り・必要な枚数・進み具合・比べに入れない） */
   quantity: number | null
@@ -95,7 +98,7 @@ export interface Job {
   /** 固定した1枚（固定した順） */
   frozenSheets: FrozenSheet[]
   /**
-   * 履歴（第2.1版。仕様書 25.1）。新しい順・最大 20件（engine/history の HISTORY_LIMIT）。
+   * 履歴（第2.1版。仕様書 25.1）。新しい順・最大 20件（engine/history の HISTORY_LIMIT）。部材の W・H も数字だけ（第2.2版）。
    * 第2.0版までの保存データ・バックアップ・送るファイルには無いので、読むときに空にする（shape.ts の readJob）
    */
   history: HistoryEntry[]
@@ -105,7 +108,7 @@ export interface Job {
 }
 
 /**
- * 履歴に残す部材（第2.1版。仕様書 25.1）：名前・W・H の式（式のまま）・枚数・回転・仕上がりのチェック。
+ * 履歴に残す部材（第2.1版。仕様書 25.1）：名前・W・H（第2.2版から数字だけ）・枚数・回転・仕上がりのチェック。
  * id は持たない（戻すときに新しい id を振る。engine/history の restoreHistory）
  */
 export interface HistoryPart {
@@ -116,10 +119,7 @@ export interface HistoryPart {
   finishedDone: boolean
 }
 
-/**
- * 履歴の1件（第2.1版。仕様書 25.1）。「履歴に残す」を押したときの設定と部材の写しと、そのときの結果。
- * 調整寸法は入れない（アプリ全体で1つの一覧なので、戻したときは今の調整寸法で計算する）
- */
+/** 履歴の1件（第2.1版。仕様書 25.1）。「履歴に残す」を押したときの設定と部材の写しと、そのときの結果 */
 export interface HistoryEntry {
   /** 仕事の中で重複しない */
   id: string
@@ -199,7 +199,7 @@ export interface CellPos {
 }
 
 /**
- * コピーしたセル（四角い形）。cells[行][列] はセルの中身の文字（名前・式は書いたまま・枚数は数字の文字。空は ''）。
+ * コピーしたセル（四角い形）。cells[行][列] はセルの中身の文字（名前・W・H は書いたまま・枚数は数字の文字。空は ''）。
  * 1つのセルなら rows = cols = 1
  */
 export interface CellClip {
@@ -232,13 +232,17 @@ export interface CellCut {
 
 // ---------- 寸法の計算結果 ----------
 
+/**
+ * 寸法のエラーの種類。第2.2版の computeDimensions が出すのは syntax（空・数字でない）と nonPositive（0 以下）だけ。
+ * ほかは前の版の式の計算（engine/migrate/legacyDimensions）だけが出す
+ */
 export type DimensionErrorKind =
-  | 'syntax' // 式が読めない
-  | 'unknownRef' // 存在しない部材名を参照
-  | 'unknownAdjust' // 式が使っている調整寸法が削除されている
-  | 'cycle' // 循環参照
-  | 'nonPositive' // 計算結果が 0 以下
-  | 'divideByZero' // 0 で割った
+  | 'syntax' // 数字でない・空（前の版：式が読めない）
+  | 'unknownRef' // 前の版：存在しない部材名を参照
+  | 'unknownAdjust' // 前の版：式が使っている調整寸法が削除されている
+  | 'cycle' // 前の版：循環参照
+  | 'nonPositive' // 0 以下
+  | 'divideByZero' // 前の版：0 で割った
 
 export interface DimensionError {
   partId: string
@@ -246,17 +250,14 @@ export interface DimensionError {
   kind: DimensionErrorKind
   /** 画面にそのまま出せる日本語 */
   message: string
-  /** unknownRef の部材名、cycle の部材名の並び */
+  /** 前の版：unknownRef の部材名、cycle の部材名の並び */
   refs?: string[]
   /**
-   * 入れている途中の形の式（syntax のときだけ。空・終わりが記号や「(」・かっこが閉じていない・「1.」。第1.4版。仕様書 18.5）。
-   * 画面は入力中のセルのこのエラーを出さない。参照している寸法に伝わったエラー（from のあるもの）には付けない
+   * 入れている途中の形（syntax のときだけ。空・「12.」。前の版は式の終わりが記号・かっこが閉じていない も。第1.4版。仕様書 18.5）。
+   * 画面は入力中のセルのこのエラーを出さない
    */
   incomplete?: true
-  /**
-   * エラーのある寸法を参照しているために計算できないとき、元のエラーがある寸法。
-   * 自分の式にエラーがあるときは付かない
-   */
+  /** 前の版：エラーのある寸法を参照しているために計算できないとき、元のエラーがある寸法 */
   from?: { partId: string; axis: Axis }
 }
 
@@ -266,11 +267,11 @@ export interface PartDimensions {
   name: string
   /** 部材の枚数（null は枚数が空） */
   quantity: number | null
-  /** 仕上がり寸法（式の計算結果）。エラーがあれば null */
+  /** 仕上がり寸法（入れた数字）。エラーがあれば null */
   finished: Record<Axis, number> | null
   /** 木取り寸法（仕上がり ＋ 切り代。W・H それぞれに1回）。エラーがあれば null */
   cut: Record<Axis, number> | null
-  /** 軸ごとの仕上がり寸法（計算できた軸だけ）。片方の軸だけエラーのとき、式の隣に出す値（仕様書 5.2）に使う */
+  /** 軸ごとの仕上がり寸法（出せた軸だけ）。片方の軸だけエラーのときも、もう片方の値は出す */
   finishedByAxis: Partial<Record<Axis, number>>
   /** 軸ごとの木取り寸法（計算できた軸だけ） */
   cutByAxis: Partial<Record<Axis, number>>

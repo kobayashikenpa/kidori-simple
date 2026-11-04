@@ -2,12 +2,10 @@
 import { describe, expect, it } from 'vitest'
 import { duplicatePart } from './clipboard/copy'
 import { computeDimensions } from './dimensions'
-import { partsReferencing } from './dimensions/resolve'
 import { freezeAt, withPart } from './fixtures/progress'
-import { shelfAdjusts, shelfJob } from './fixtures/shelf'
+import { shelfJob } from './fixtures/shelf'
 import { renamePart } from './formula/rename'
 import { validatePartName } from './formula/tokenize'
-import { adjustUsages } from './formula/usages'
 import { packJob } from './packing'
 import { compareStandardSizes } from './packing/sizes'
 import { cutQuantity, hasName, partLabel, partLabels, referableParts } from './parts'
@@ -16,8 +14,7 @@ import { partCutProgress } from './progress/partProgress'
 import { sheetPartChecklist } from './progress/sheetChecklist'
 import type { Job, Part } from './types'
 
-const adjusts = shelfAdjusts()
-const dimsOf = (job: Job) => computeDimensions(job, adjusts)
+const dimsOf = (job: Job) => computeDimensions(job)
 
 function part(id: string, name: string, W: string, H: string, quantity: number | null, rotatable = false): Part {
   return { id, name, expr: { W, H }, quantity, rotatable, finishedDone: false }
@@ -88,21 +85,8 @@ describe('名前が空の部材', () => {
     expect(pls.every((p) => p.name === '#5')).toBe(true)
   })
 
-  it('名前が空の部材の式は、名前のある部材を参照できる', () => {
-    const job = withParts(part('p5', '', '天板.W - 10', '側板.H', 1))
-    const d = dimsOf(job).parts.find((x) => x.partId === 'p5')!
-    expect(d.finished).toEqual({ W: 390, H: 700 })
-  })
-
-  it('空の名前の部材があっても、参照の「.W」だけの式はエラー（空の名前を参照にしない）', () => {
-    const job = withParts(part('p5', '', '300', '400', 1), part('p6', 'X', '.W', '100', 1))
-    const d = dimsOf(job).parts.find((x) => x.partId === 'p6')!
-    expect(d.finished).toBeNull()
-    expect(d.errors.length).toBeGreaterThan(0)
-  })
-
   it('入らない部材・エラーの部材の知らせも #行番号', () => {
-    const job = withParts(part('p5', '', '3000', '400', 1), part('p6', '', '1/0', '400', 1))
+    const job = withParts(part('p5', '', '3000', '400', 1), part('p6', '', '0', '400', 1))
     const r = packJob(job, dimsOf(job))
     expect(r.unplaced).toEqual([{ partId: 'p5', name: '#5', reason: 'tooLarge' }])
     expect(r.skipped).toEqual([{ partId: 'p6', name: '#6', reason: 'dimensionError' }])
@@ -124,13 +108,6 @@ describe('名前が空の部材', () => {
     expect(drift.find((d) => d.partId === 'p5')?.name).toBe('#5')
   })
 
-  it('式で使っている部材の一覧（partsReferencing）・調整寸法を使っている部材（adjustUsages）も #行番号', () => {
-    const job = withParts(part('p5', '', '天板.W', `100 + {n:${adjusts[0].id}}`, 1))
-    expect(partsReferencing(job.parts, 'part-tenita').map((r) => r.name)).toContain('#5')
-    const u = adjustUsages({ jobs: [job] }, adjusts[0].id)
-    expect(u.map((x) => x.partName)).toEqual(['棚板', '#5'])
-  })
-
   it('複製：名前が空なら空のまま', () => {
     const job = withParts(part('p5', '', '300', '400', 1))
     const r = duplicatePart(job, 'p5', () => 'p-dup')
@@ -140,16 +117,14 @@ describe('名前が空の部材', () => {
 })
 
 describe('枚数が空の部材（quantity: null）', () => {
-  it('寸法は計算する（式からも使える）', () => {
-    const job = withParts(part('p5', '幕板', '天板.W', '100', null), part('p6', '幕板2', '幕板.W - 10', '100', 1))
-    const dims = dimsOf(job)
-    expect(dims.parts.find((x) => x.partId === 'p5')).toMatchObject({ quantity: null, finished: { W: 400, H: 100 } })
-    expect(dims.parts.find((x) => x.partId === 'p6')?.finished).toEqual({ W: 390, H: 100 })
+  it('寸法は計算する', () => {
+    const job = withParts(part('p5', '幕板', '400', '100', null))
+    expect(dimsOf(job).parts.find((x) => x.partId === 'p5')).toMatchObject({ quantity: null, finished: { W: 400, H: 100 } })
   })
 
   it('packJob・必要な枚数に入らない（エラーでも入らない知らせに出さない）', () => {
     const base = shelfJob()
-    const job = withParts(part('p5', '大板', '1000', '2000', null), part('p6', '', '1/0', '100', null), part('p7', '', '5000', '100', null))
+    const job = withParts(part('p5', '大板', '1000', '2000', null), part('p6', '', '0', '100', null), part('p7', '', '5000', '100', null))
     const r0 = packJob(base, dimsOf(base))
     const r = packJob(job, dimsOf(job))
     expect(r.sheetCount).toBe(r0.sheetCount)
@@ -170,26 +145,5 @@ describe('枚数が空の部材（quantity: null）', () => {
     expect(partCutProgress(blank).map((r) => r.name)).toEqual(['天板', '棚板'])
     const drift = frozenSheetViews(blank, dimsOf(blank))[0].drift
     expect(drift.find((d) => d.partId === 'part-gawaita')?.reason).toBe('count')
-  })
-})
-
-describe('名前を空にする・空から名前を付ける（renamePart）', () => {
-  it('空にしても式の参照は「.W」にならず、元の名前のまま残ってエラーになる', () => {
-    const job = shelfJob()
-    const r = renamePart(job.parts, 'part-zentai', '')
-    expect(r.ok).toBe(true)
-    if (!r.ok) return
-    expect(r.parts[1].expr).toEqual({ W: '全体.W', H: '全体.H' })
-    const d = dimsOf({ ...job, parts: r.parts }).parts[1]
-    expect(d.errors[0].kind).toBe('unknownRef')
-  })
-
-  it('空の部材に名前を付けると、ほかの式は変わらず、その名前で参照できるようになる', () => {
-    const job = withParts(part('p5', '', '300', '400', 1), part('p6', 'X', '幕板.W', '100', 1))
-    const r = renamePart(job.parts, 'p5', '幕板')
-    expect(r.ok).toBe(true)
-    if (!r.ok) return
-    expect(r.parts[5].expr.W).toBe('幕板.W')
-    expect(dimsOf({ ...job, parts: r.parts }).parts[5].finished).toEqual({ W: 300, H: 100 })
   })
 })

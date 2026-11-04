@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from '../engine/dimensions'
-import { shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
+import { legacyShelfJob, shelfAdjusts, shelfJob } from '../engine/fixtures/shelf'
 import { newPart } from '../store/jobs'
 import type { DimensionError } from '../engine/types'
 import {
@@ -87,16 +87,16 @@ describe('部材の表の行（仕様書 15.1）', () => {
 describe('部材の表の W・H の欄（見本 6章）', () => {
   const job = shelfJob()
   const adjusts = shelfAdjusts()
-  const dims = computeDimensions(job, adjusts)
+  const dims = computeDimensions(job)
   const cell = (name: string, axis: 'W' | 'H') => {
     const p = job.parts.find((x) => x.name === name)!
     return tableDimCell(p, dims.parts.find((d) => d.partId === p.id), axis, adjusts)
   }
 
-  it('数値はその数値、式は計算した寸法（仕上がり）', () => {
+  it('数値はその数値（仕上がり）', () => {
     expect(cell('全体', 'W')).toEqual({ kind: 'number', value: 400 })
-    expect(cell('棚板', 'W')).toMatchObject({ kind: 'formula', value: 379 })
-    expect(cell('棚板', 'H')).toMatchObject({ kind: 'formula', value: 1760 })
+    expect(cell('棚板', 'W')).toEqual({ kind: 'number', value: 379 })
+    expect(cell('棚板', 'H')).toEqual({ kind: 'number', value: 1760 })
   })
 
   it('空の欄は空（エラーにしない）', () => {
@@ -115,7 +115,8 @@ describe('全部回転してよい・削除の確認・木取りの表（U-12）
   })
 
   it('消す部材の寸法を、残る部材の式が使っているか（消す部材どうしは数えない）', () => {
-    const parts = shelfJob().parts
+    // 部材どうしの参照は第2.2版でなくした（U-27 のあとに消せる）。前の版の式の見本で確かめる
+    const parts = legacyShelfJob().parts
     expect(referencingOthers(parts, ['part-tanaita'])).toEqual([])
     expect(referencingOthers(parts, ['part-tenita'])).toEqual([{ partId: 'part-tanaita', name: '棚板', axes: ['W', 'H'] }])
     expect(referencingOthers(parts, ['part-tenita', 'part-tanaita'])).toEqual([])
@@ -130,10 +131,10 @@ describe('全部回転してよい・削除の確認・木取りの表（U-12）
 
   it('木取りの表の W・H は木取り寸法（仕上がり ＋ 切り代）', () => {
     const job = shelfJob()
-    const dims = computeDimensions(job, shelfAdjusts())
+    const dims = computeDimensions(job)
     const tanaita = job.parts[3]
     const d = dims.parts.find((x) => x.partId === tanaita.id)
-    expect(cutDimCell(tanaita, d, 'W', shelfAdjusts())).toMatchObject({ kind: 'formula', value: 389 })
+    expect(cutDimCell(tanaita, d, 'W', shelfAdjusts())).toEqual({ kind: 'number', value: 389 })
     expect(cutDimCell(job.parts[2], dims.parts[2], 'H', shelfAdjusts())).toEqual({ kind: 'number', value: 710 })
     expect(cutDimCell(newPart('x'), undefined, 'W', shelfAdjusts())).toEqual({ kind: 'empty' })
   })
