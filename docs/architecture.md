@@ -665,7 +665,7 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
 
 ### 15.2 前のデータの式を数字に置き換える（E-20。spec 26.4。`src/engine/migrate/`）
 
-- `migrate/legacyDimensions.ts`：第2.1版の式の計算（`legacyComputeDimensions(job, adjusts)`）。置き換え専用。`formula/`（tokenize・parse・evaluate・display・units）と `dimensions/resolve.ts` は、これと画面（U-27 まで）が使うので残した
+- `migrate/legacyDimensions.ts`：第2.1版の式の計算（`legacyComputeDimensions(job, adjusts)`）。置き換え専用。`formula/`（tokenize・parse・evaluate）と `dimensions/resolve.ts` は、これが使うので残した（display・units・`partsReferencing`・`splitLeadingEquals` は U-27 で消した）
 - `migrate/numbers.ts`：
   - `numberizeJob(job, adjusts)`・`numberizeJobs(jobs, adjusts)` → `{ job(s), report: NumberingReport }`。式（`isSizeInput` でない W・H）を、そのデータの調整寸法の一覧（`LegacyAdjust[]`。書きかけの行は使えない）で計算した仕上がり寸法の数字（小数第1位）にする。エラーは空にし `report.cleared`（`ClearedSize`：jobId・jobName・partName・axis・履歴なら history）に入れる。履歴の部材も、その履歴の中で計算する。式が無ければ同じ仕事を返す
   - `NumberingReport = { replaced, cleared }`・`NO_NUMBERING`・`mergeNumbering`・`numberingMessage(report)`（知らせの文）・`clipHasFormula(clip)`
@@ -679,4 +679,12 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
 - `shape.ts` の `readLegacyAdjusts`：前の保存データの `adjusts` を置き換えのためだけに読む（無ければ空）
 - 部材の名前：同じ名前でもよい・使える文字の決まりも無い（暫定）。名前を変えても式の書き換えは無い。貼り付け・オートフィルは書いたまま（番号を振らない。`renamed` はなくした）
 - 送るファイル・バックアップ：`jobFile(job)`・`backupFile({ jobs })`。`adjusts` はいつも `[]`（形は変えない）
+
+### 15.4 画面：数字だけのキー・置き換えの知らせ（U-27。spec 26.1〜26.4）
+
+- 部材の表のキーは `ui/components/PadKeys.tsx`（5列 × 4段：全部消す 1 2 3 ⌫ ／ ◀ 4 5 6 ▶ ／ 閉じる（2段） 7 8 9 次へ（2段） ／ 0（2列） .）。W・H も枚数も同じ並びで、枚数は小数点・◀ ▶ を押せない。`FormulaKeys.tsx`・`ui/formulaEdit.ts` はなくした
+- W・H の数字の編集は `ui/sizeEdit.ts` の `pressSizeKey(text, cursor, key)`（カーソルは文字の位置。入れたあとの形は engine の `isSizeInput`。先頭の「.」は「0.」、先頭の余分な 0 は外す。8字まで）。枚数は今までどおり `ui/numpad.ts`
+- キーの上の行は 部材の名前・W（妻手）・入れている数字とカーソル。入れている途中（incomplete）でないエラー（0 以下など）は赤で理由を出す（`errorsWhileEditing`）。入力中のセルは赤い「エラー」にしない
+- 表の W・H の欄は数字かエラーだけ（`ui/partCells.ts` の `dimCell(dims, axis, tab)`。式の表示・ƒ・色の枠はなくした）。行を削除の確認から、式で使われている部材の知らせ（`referencingOthers`）をなくした
+- 置き換えの知らせは `ui/App.tsx` の上の帯：`numberingMessage(state.numbering)` の文と「閉じる」（`dismissNumbering`）。エラーで空にしたものがあれば注意の色（warn）、無ければ ok の色。長いときは帯の中だけスクロール（高さは画面の 30% まで）
 

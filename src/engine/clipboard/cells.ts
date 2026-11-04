@@ -413,7 +413,7 @@ export function clearCells(job: Job, selected: CellSelection): Job {
 
 /**
  * 選んだセルのある行の部材をまとめて消す（空の行だけなら同じ仕事を返す）。
- * 式で使われているかの確認は、selectedPartIds の部材を dimensions/resolve の partsReferencing で調べる（画面では ui/partsTable の referencingOthers）
+ * 第2.2版で式はなくなったので、ほかの部材の式で使われているかの確認はしない（画面はいつも削除の確認だけ出す）
  */
 export function deleteRows(job: Job, selected: CellSelection): Job {
   const ids = new Set(selectedPartIds(job, selected))

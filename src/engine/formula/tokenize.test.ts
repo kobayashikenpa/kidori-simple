@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeFormulaText, splitLeadingEquals, tokenize, validatePartName } from './tokenize'
+import { normalizeFormulaText, tokenize, validatePartName } from './tokenize'
 
 /** 位置の情報を除いて、字句の中身だけを比べる */
 function kinds(expr: string) {
@@ -288,10 +288,4 @@ describe('先頭の「＝」（仕様書 20.2。エクセルと同じく「＝�
     expect(tokenize('==1').ok).toBe(false)
   })
 
-  it('splitLeadingEquals：先頭の「＝」と前後の空白を外した式と、付いていたか', () => {
-    expect(splitLeadingEquals('＝天板.W - 20')).toEqual({ equals: true, rest: '天板.W - 20' })
-    expect(splitLeadingEquals(' = 5')).toEqual({ equals: true, rest: '5' })
-    expect(splitLeadingEquals('天板.W - 20')).toEqual({ equals: false, rest: '天板.W - 20' })
-    expect(splitLeadingEquals('')).toEqual({ equals: false, rest: '' })
-  })
 })

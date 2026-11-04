@@ -60,7 +60,7 @@ export function clampRange(r: CellRange, rowCount: number): CellRange | null {
 
 const CLIP_TEXT_MAX = 10
 
-/** 今コピーしているもの（部材の表・調整寸法の表で同じ）：「コピー中：1つ（400）」「コピー中：2行×2列」（切り取りなら「切り取り中：…」）。無ければ null */
+/** 今コピーしているもの：「コピー中：1つ（400）」「コピー中：2行×2列」（切り取りなら「切り取り中：…」）。無ければ null */
 export function clipText(clip: (Pick<CellClip, 'rows' | 'cols' | 'cells'> & { cut?: unknown }) | null): string | null {
   if (!clip) return null
   const head = clip.cut ? '切り取り中' : 'コピー中'
@@ -72,30 +72,22 @@ export function clipText(clip: (Pick<CellClip, 'rows' | 'cols' | 'cells'> & { cu
   return `${head}：${clip.rows}行×${clip.cols}列`
 }
 
-/** 名前に番号を振ったときに足す一言（仕様書 18.3） */
-export const RENAMED_NOTE = '同じ名前にならないよう番号を振りました'
-
-const withRenamed = (text: string, renamed: number) => (renamed > 0 ? `${text}。${RENAMED_NOTE}` : text)
-
-/**
- * 貼り付けの知らせ：「3個のセルに貼りました（貼れなかったもの 1個：…）」。
- * 名前に番号を振ったセルがあれば（renamed は数）「。同じ名前にならないよう番号を振りました」を足す
- */
-export function pasteText(pasted: number, skipped: readonly Pick<PasteSkip, 'message'>[], renamed = 0): string {
+/** 貼り付けの知らせ：「3個のセルに貼りました（貼れなかったもの 1個：…）」（第2.2版で名前に番号を振るのはやめた。仕様書 26.3） */
+export function pasteText(pasted: number, skipped: readonly Pick<PasteSkip, 'message'>[]): string {
   if (pasted === 0 && skipped.length === 0) return '貼れるセルがありませんでした'
   const head = pasted === 0 ? '貼れませんでした' : `${pasted}個のセルに貼りました`
-  if (skipped.length === 0) return withRenamed(head, renamed)
+  if (skipped.length === 0) return head
   const reasons = [...new Set(skipped.map((s) => s.message))].join('・')
-  return withRenamed(`${head}（貼れなかったもの ${skipped.length}個：${reasons}）`, renamed)
+  return `${head}（貼れなかったもの ${skipped.length}個：${reasons}）`
 }
 
-/** オートフィルの知らせ：「4個のセルに入れました（入れられなかったもの 2個：…）」。番号を振ったら一言足す */
-export function fillText(pasted: number, skipped: readonly Pick<PasteSkip, 'message'>[], renamed = 0): string {
+/** オートフィルの知らせ：「4個のセルに入れました（入れられなかったもの 2個：…）」 */
+export function fillText(pasted: number, skipped: readonly Pick<PasteSkip, 'message'>[]): string {
   if (pasted === 0 && skipped.length === 0) return '入れるセルがありませんでした'
   const head = pasted === 0 ? '入れられませんでした' : `${pasted}個のセルに入れました`
-  if (skipped.length === 0) return withRenamed(head, renamed)
+  if (skipped.length === 0) return head
   const reasons = [...new Set(skipped.map((s) => s.message))].join('・')
-  return withRenamed(`${head}（入れられなかったもの ${skipped.length}個：${reasons}）`, renamed)
+  return `${head}（入れられなかったもの ${skipped.length}個：${reasons}）`
 }
 
 /**

@@ -171,16 +171,3 @@ export function resolve(parts: readonly Part[], adjusts?: readonly Adjust[]): Re
   const errors = [...nodes.keys()].flatMap((key) => ownErrors.get(key) ?? [])
   return { nodes, order, errors }
 }
-
-/** その部材の寸法を式で使っている、ほかの部材（部材の並び順。軸は W→H。name は表示用の名前）。部材の削除の前の確認に使う */
-export function partsReferencing(parts: readonly Part[], partId: string): { partId: string; name: string; axes: Axis[] }[] {
-  const { nodes } = resolve(parts)
-  const labels = partLabels(parts)
-  const out: { partId: string; name: string; axes: Axis[] }[] = []
-  for (const p of parts) {
-    if (p.id === partId) continue
-    const axes = AXES.filter((a) => nodes.get(dimKey(p.id, a))?.deps.some((d) => d.partId === partId))
-    if (axes.length > 0) out.push({ partId: p.id, name: labels.get(p.id)!, axes })
-  }
-  return out
-}

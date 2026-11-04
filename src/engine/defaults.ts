@@ -56,7 +56,7 @@ export function defaultAppData(): AppData {
 /**
  * 前の版の調整寸法の表示名＝名前＋寸法（例：逃げ1、ほぞ15、シート0.5。「mm」は付けない。仕様書 4.1）。
  * 寸法は丸めない（0.25 を 0.3 と見せない）。浮動小数の誤差（0.1 + 0.2 など）だけ消す。kidori の nigeName。
- * 第2.2版では前の版の式の表示（formula/display）・エラーの文（formula/parse）だけで使う
+ * 第2.2版では前の版の式のエラーの文（formula/parse。前のデータの置き換えで使う）だけで使う
  */
 export function adjustName(adjust: Pick<Adjust, 'name' | 'value'>): string {
   return `${adjust.name}${exactText(adjust.value)}`

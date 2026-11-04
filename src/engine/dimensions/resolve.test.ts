@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { legacyShelfJob as shelfJob } from '../fixtures/shelf'
 import type { Axis, Part } from '../types'
-import { partsReferencing, resolve } from './resolve'
+import { resolve } from './resolve'
 
 function mkPart(name: string, expr: Partial<Record<Axis, string>>): Part {
   return {
@@ -109,21 +109,5 @@ describe('全角・半角の違う部材名', () => {
     const r = resolve([mkPart('棚板１', { W: '300' }), mkPart('X', { W: '棚板１．Ｗ + 1' })])
     expect(r.errors).toEqual([])
     expect(r.nodes.get('id-X:W')!.deps).toEqual([{ partId: 'id-棚板１', axis: 'W' }])
-  })
-})
-
-describe('partsReferencing：その部材の寸法を式で使っている、ほかの部材（部材の削除の確認に使う）', () => {
-  it('天板を使っているのは棚板（W・H）。全体を使っているのは天板（W・H）・側板（W）', () => {
-    const parts = shelfJob().parts
-    expect(partsReferencing(parts, 'part-tenita')).toEqual([{ partId: 'part-tanaita', name: '棚板', axes: ['W', 'H'] }])
-    expect(partsReferencing(parts, 'part-zentai')).toEqual([
-      { partId: 'part-tenita', name: '天板', axes: ['W', 'H'] },
-      { partId: 'part-gawaita', name: '側板', axes: ['W'] },
-    ])
-  })
-  it('だれも使っていなければ空。自分自身の参照は数えない', () => {
-    const parts = shelfJob().parts
-    expect(partsReferencing(parts, 'part-tanaita')).toEqual([])
-    expect(partsReferencing([mkPart('A', { W: 'A.H', H: '1' })], 'id-A')).toEqual([])
   })
 })

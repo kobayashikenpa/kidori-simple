@@ -127,7 +127,7 @@ export type StoreAction =
   | ({ type: 'fillCells'; from: CellRange; to: CellRange } & OnJob)
   /** 選んだセルの中身を消す（行の全部の欄が空になった部材は消える） */
   | ({ type: 'clearCells' } & SelectionArg & OnJob)
-  /** 選んだセルのある行の部材をまとめて消す（式で使われているかの確認は画面の側で先に行う） */
+  /** 選んだセルのある行の部材をまとめて消す（画面の側で先に確認を出す） */
   | ({ type: 'deleteRows' } & SelectionArg & OnJob)
   /** 切り出しチェック（その1枚の、ある部材の片をまとめて付け外し） */
   | ({ type: 'setPartCheck'; target: SheetTarget; partId: string; done: boolean } & OnJob)

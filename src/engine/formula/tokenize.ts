@@ -65,15 +65,6 @@ function leadingEqualsEnd(expr: string): number {
   return i < expr.length && normalizeFormulaText(expr[i]) === '=' ? i + 1 : 0
 }
 
-/**
- * 式の先頭の「＝」（全角 ＝・半角 =。前の空白も）を外す（第1.6版。仕様書 20.2）。
- * rest は「＝」と、その前後の空白を外した残り。equals は「＝」が付いていたか。保存する式は「＝」を付けない形（rest）
- */
-export function splitLeadingEquals(expr: string): { equals: boolean; rest: string } {
-  const end = leadingEqualsEnd(expr)
-  return end === 0 ? { equals: false, rest: expr } : { equals: true, rest: expr.slice(end).trimStart() }
-}
-
 /** 記号と空白で区切った「ひとかたまり」の文字列。記号・空白以外が続く部分 */
 export interface Chunk {
   text: string
@@ -122,7 +113,7 @@ export function splitChunks(expr: string): (Token | Chunk)[] {
  * 部材名には . を使えないので、. はちょうど1つ。その前が部材名、後ろが軸。
  * 全角はそろえてから読むので、返す部材名はそろえた後の名前（normalizePartName と同じ形）
  */
-export function parseRefText(raw: string): { part: string; axis: Axis } | null {
+function parseRefText(raw: string): { part: string; axis: Axis } | null {
   const text = normalizeFormulaText(raw)
   const dot = text.indexOf('.')
   if (dot <= 0 || dot !== text.lastIndexOf('.')) return null
