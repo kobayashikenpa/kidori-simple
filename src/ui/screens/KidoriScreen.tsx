@@ -6,7 +6,7 @@
 // 計算はすべて engine（computeDimensions → packJob・compareStandardSizes・frozenSheetViews・sheetPartChecklist・partCutProgress）、
 // チェックの付け外しは store の setPartCheck（engine の setPartCheck）。
 // pieceId は1枚の中でだけ重ならないので、1枚をまたぐキーは1枚の id（固定した1枚の id、計算した1枚は「c」＋何枚目か）と組にする
-// 部材・設定・調整寸法・固定した1枚が変わったときだけ計算し直す（useMemo）
+// 部材・設定・固定した1枚が変わったときだけ計算し直す（useMemo）
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { computeDimensions } from '../../engine/dimensions'
 import { packJob } from '../../engine/packing'
@@ -213,7 +213,7 @@ export function KidoriScreen() {
       {result.skipped.length > 0 && (
         <div className="card kd-issues warn" role="alert">
           <h4>計算から外した部材（寸法のエラー）</h4>
-          <p className="band-note">部材の画面で式を直すと、木取りに入ります。</p>
+          <p className="band-note">部材の画面で寸法を直すと、木取りに入ります。</p>
           <ul>
             {result.skipped.map((k) => {
               const msg = dims.parts.find((d) => d.partId === k.partId)?.errors[0]?.message
