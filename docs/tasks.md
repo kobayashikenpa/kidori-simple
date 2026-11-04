@@ -624,3 +624,10 @@ E-16 → U-23 の順。同じブランチ（v17-adjust-table）に積んでま�
 - （暫定・U-27）**置き換えの知らせ**は画面の上（仕事の名前の下、読み込みの知らせと同じ場所）の帯に出し、「閉じる」で消す。どのタブでも出る。エラーで空にしたものがあれば注意の色（茶）、無ければ青。件数が多くても文は省かず、帯の中だけスクロール（高さは画面の 30% まで）。ファイルを取り込んだときも同じ帯（取り込みの「◯◯を取り込みました」の知らせとは別）
 - （暫定・U-27）「ファイルから取り込む」の ⓘ に「前の版（キドリライトなど）で式を使って入れた W・H は、取り込むときに計算した数字に置き換えます」を足した
 - （U-27）消したもの：`ui/components/FormulaKeys.tsx`（式のキーと式の表示）・`ui/formulaEdit.ts`・`engine/formula/display.ts`・`engine/formula/units.ts`・`dimensions/resolve.ts` の `partsReferencing`・`ui/partsTable.ts` の `referencingOthers`・`tokenize.ts` の `splitLeadingEquals`（`parseRefText` は外に出さないようにした）・`ui/cellSelect.ts` の番号振りの引数と `RENAMED_NOTE`・調整寸法の表・式の表示・色の枠の CSS と色（--refc-0〜4）。`useGrid` の `noLongPress` は無くてもよい形にした。作ったもの：`ui/components/PadKeys.tsx`・`ui/sizeEdit.ts`（テストつき）
+
+### 第2.2版の未決事項への回答（2026-11-05 オーナー。仕様書 26.6）
+
+- キーの「閉じる」は残す → 今のまま
+- 名前に空白・記号を使える → 今のまま
+- 複製の名前は「棚板のコピー」のまま（同じ名前では複製しない） → 今のまま
+- 書き出したファイルをキドリライトで開けるようにはしない → 今のまま
