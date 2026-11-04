@@ -1,51 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { legacyShelfJob as shelfJob, shelfAdjusts } from '../engine/fixtures/shelf'
-import { legacyComputeDimensions } from '../engine/migrate/legacyDimensions'
+import { computeDimensions } from '../engine/dimensions'
+import { shelfJob } from '../engine/fixtures/shelf'
 import type { Axis } from '../engine/types'
-import { dimCell, isNumberOnly } from './partCells'
+import { dimCell } from './partCells'
 import type { PartsTab } from './partsTab'
 
 function cellOf(name: string, axis: Axis, tab: PartsTab, edit?: (job: ReturnType<typeof shelfJob>) => void) {
   const job = shelfJob()
   edit?.(job)
-  const adjusts = shelfAdjusts()
-  // 式の表示は U-27 でなくす。それまでは前の版の式の見本で確かめる
-  const dims = legacyComputeDimensions(job, adjusts)
+  const dims = computeDimensions(job)
   const part = job.parts.find((p) => p.name === name)!
-  return dimCell(part, dims.parts.find((d) => d.partId === part.id), axis, tab, adjusts)
+  return dimCell(dims.parts.find((d) => d.partId === part.id), axis, tab)
 }
 
-describe('部材の一覧の W・H の欄（仕様書 5.2・6章の例）', () => {
-  it('数値だけなら数値だけ（全体 W400）。木取りのタブは木取り寸法', () => {
+describe('部材の表の W・H の欄（仕様書 5.2・26.1・6章の例）', () => {
+  it('仕上がりのタブは仕上がり寸法、木取りのタブは木取り寸法（仕上がり ＋ 切り代）', () => {
     expect(cellOf('全体', 'W', 'finished')).toEqual({ kind: 'number', value: 400 })
+    expect(cellOf('棚板', 'W', 'finished')).toEqual({ kind: 'number', value: 379 })
+    expect(cellOf('棚板', 'W', 'cut')).toEqual({ kind: 'number', value: 389 })
     expect(cellOf('側板', 'H', 'cut')).toEqual({ kind: 'number', value: 710 })
   })
-  it('式なら 式 ｜ 計算した寸法。棚板 W＝天板.W − 20 − メラミン1 ｜ 379（木取り 389）', () => {
-    expect(cellOf('棚板', 'W', 'finished')).toEqual({ kind: 'formula', formula: '天板.W − 20 − メラミン1', value: 379 })
-    expect(cellOf('棚板', 'W', 'cut')).toEqual({ kind: 'formula', formula: '天板.W − 20 − メラミン1', value: 389 })
-    expect(cellOf('棚板', 'H', 'finished')).toEqual({ kind: 'formula', formula: '天板.H − 20 × 2', value: 1760 })
-  })
-  it('式がエラーなら理由（engine の message）を持つ', () => {
+  it('0 はエラー（理由は engine の文）', () => {
     const c = cellOf('側板', 'W', 'finished', (j) => {
-      j.parts[2].expr.W = '奥板.W'
+      j.parts[2].expr.W = '0'
     })
-    expect(c.kind).toBe('error')
-    if (c.kind === 'error') {
-      expect(c.formula).toBe('奥板.W')
-      expect(c.messages.join('')).toContain('奥板')
-    }
+    expect(c).toEqual({ kind: 'error', messages: ['0 より大きい数を入れてください'] })
   })
-  it('空の式もエラー', () => {
+  it('空もエラー（表では呼ぶ側が空の欄にする）', () => {
     const c = cellOf('側板', 'H', 'finished', (j) => {
       j.parts[2].expr.H = ''
     })
-    expect(c).toMatchObject({ kind: 'error', formula: null })
-  })
-  it('isNumberOnly', () => {
-    expect(isNumberOnly('900')).toBe(true)
-    expect(isNumberOnly('12.5')).toBe(true)
-    expect(isNumberOnly('')).toBe(false)
-    expect(isNumberOnly('900 - 1')).toBe(false)
-    expect(isNumberOnly('全体.W')).toBe(false)
+    expect(c.kind).toBe('error')
   })
 })

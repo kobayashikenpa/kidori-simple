@@ -1,6 +1,6 @@
-// エクセルのような表（部材の表・調整寸法の表）のセルを選ぶ仕組み（仕様書 17.1・17.2・17.4・21.1）。
+// エクセルのような表（部材の表）のセルを選ぶ仕組み（仕様書 17.1・17.2・17.4）。
 // 選んでいる範囲と起点・丸い取っ手で範囲を広げる・四角い取っ手でオートフィル・長押しでメニュー・取っ手と点線の印の位置。
-// 第1.7版で PartsTable から外に出し、調整寸法の表（AdjustTable）でも同じ仕組みを使う。
+// 第1.7版で PartsTable から外に出した（第2.2版で調整寸法の表はなくなり、使うのは部材の表だけ）。
 // 選んでいる範囲はアプリで1つの表だけ（ほかの表が選んだら、こちらの範囲は外す。exclusive.ts の claimOpen）
 // 第2.0版：選んでいる行の番号を上下に引くと、その行を動かす（部材の表だけ。moveRowsFrom・onMoveRows。仕様書 24.2）
 import {
@@ -89,8 +89,8 @@ export interface GridOptions {
   onPressRow: (row: number) => void
   /** 長押し（メニューを開く） */
   onLongPress: (at: PressAt) => void
-  /** 長押しのメニューを出さないとき（「＝」で寸法を入れている間など） */
-  noLongPress: () => boolean
+  /** 長押しのメニューを出さないとき（無ければいつも出す） */
+  noLongPress?: () => boolean
   /** オートフィル（指を離したとき。to は元を含む範囲） */
   onFill: (from: CellRange, to: CellRange) => void
   /** オートフィルの取っ手を押し始めたとき */
@@ -282,7 +282,7 @@ export function useGrid(opts: GridOptions) {
     endDrag()
     cancelPress()
     // 左上の丸い取っ手は、選んでいる行の一番上の番号に重なる。番号の上なら、取っ手ではなく番号を押したことにする（引くと行を動かす。仕様書 24.2）
-    if (which === 'start' && !o.current.noLongPress()) {
+    if (which === 'start' && !o.current.noLongPress?.()) {
       const under = cellUnder(o.current.tableRef.current, e.clientX, e.clientY)
       const rows = under && under.col === null ? (o.current.moveRowsFrom?.(under.row) ?? null) : null
       if (under && rows) {
@@ -494,7 +494,7 @@ export function useGrid(opts: GridOptions) {
     cancelPress()
     // マウスの右ボタンは contextmenu で開く
     if (e.pointerType === 'mouse' && e.button !== 0) return
-    if (o.current.noLongPress()) return
+    if (o.current.noLongPress?.()) return
     const at = pressAtOf(e.target)
     if (!at) return
     const timer = window.setTimeout(() => longPress(at), LONG_PRESS_MS)
@@ -517,7 +517,7 @@ export function useGrid(opts: GridOptions) {
   const onContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (e.target instanceof Element && e.target.closest('input')) return
     e.preventDefault()
-    if (o.current.noLongPress()) return
+    if (o.current.noLongPress?.()) return
     const at = pressAtOf(e.target)
     if (at) longPress(at)
   }

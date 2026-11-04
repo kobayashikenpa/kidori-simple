@@ -5,7 +5,6 @@
 import { useMemo, useState } from 'react'
 import { computeDimensions } from '../../engine/dimensions'
 import { partCutProgress } from '../../engine/progress/partProgress'
-import type { Adjust } from '../../engine/types'
 import { browserStorage } from '../../store/storage'
 import { useJobStore } from '../../store/useJobStore'
 import { CutTable } from '../components/CutTable'
@@ -17,9 +16,6 @@ import { rotationState } from '../partsTable'
 import { loadPartsTab, PARTS_TABS, savePartsTab, type PartsTab } from '../partsTab'
 
 const ROTATION_TEXT = { all: 'オン', some: '一部', none: 'オフ' } as const
-
-/** 第2.2版（仕様書 26.2）で調整寸法はなくしたので、式の表示（U-27 でなくす）には空の一覧を渡す */
-const NO_ADJUSTS: readonly Adjust[] = []
 
 export function PartsScreen() {
   const { job, data, dispatch } = useJobStore()
@@ -102,7 +98,7 @@ export function PartsScreen() {
               <span className="rot-text">{ROTATION_TEXT[rotation]}</span>
             </button>
           </div>
-          <PartsTable job={job} dims={dims} adjusts={NO_ADJUSTS} clip={data.cellClip} dispatch={dispatch} onError={setError} />
+          <PartsTable job={job} dims={dims} clip={data.cellClip} dispatch={dispatch} onError={setError} />
         </>
       ) : (
         <>
@@ -112,7 +108,7 @@ export function PartsScreen() {
             </Help>
             <NumberField label="切り代" value={job.settings.allowance} onCommit={commitAllowance} onError={setError} />
           </div>
-          <CutTable job={job} dims={dims} adjusts={NO_ADJUSTS} progress={progress} />
+          <CutTable job={job} dims={dims} progress={progress} />
         </>
       )}
       {error && (

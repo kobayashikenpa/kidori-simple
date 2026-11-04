@@ -3,18 +3,17 @@
 // 木取り寸法は engine（computeDimensions の cutByAxis）、切った数は engine（partCutProgress）の結果を並べるだけ
 import { hasName } from '../../engine/parts'
 import type { PartCutProgress } from '../../engine/progress/partProgress'
-import type { Adjust, Axis, DimensionResult, Job } from '../../engine/types'
+import type { Axis, DimensionResult, Job } from '../../engine/types'
 import { fmt } from '../format'
 import { cutDimCell, cutQuantityText } from '../partsTable'
 
 interface Props {
   job: Job
   dims: DimensionResult
-  adjusts: readonly Adjust[]
   progress: readonly PartCutProgress[]
 }
 
-export function CutTable({ job, dims, adjusts, progress }: Props) {
+export function CutTable({ job, dims, progress }: Props) {
   const parts = job.parts
   if (parts.length === 0) return <p className="placeholder">部材はまだありません</p>
   return (
@@ -34,22 +33,11 @@ export function CutTable({ job, dims, adjusts, progress }: Props) {
         const noCut = part.quantity === 0
         const rowClass = ['pt-row', 'part', part.quantity === null ? 'noqty' : '', noCut ? 'nocut' : ''].filter(Boolean).join(' ')
         const dimEl = (axis: Axis) => {
-          const c = cutDimCell(part, d, axis, adjusts)
+          const c = cutDimCell(part, d, axis)
           const text = c.kind === 'empty' ? '空' : c.kind === 'error' ? 'エラー' : fmt(c.value)
           return (
             <span role="cell" className={`pt-cell pt-dim${c.kind === 'error' ? ' bad' : ''}`} aria-label={`${axis} ${text}`}>
-              {c.kind === 'error' ? (
-                'エラー'
-              ) : c.kind === 'empty' ? null : (
-                <>
-                  <span className="num">{fmt(c.value)}</span>
-                  {c.kind === 'formula' && (
-                    <span className="pt-f" aria-hidden="true">
-                      ƒ
-                    </span>
-                  )}
-                </>
-              )}
+              {c.kind === 'error' ? 'エラー' : c.kind === 'empty' ? null : <span className="num">{fmt(c.value)}</span>}
             </span>
           )
         }

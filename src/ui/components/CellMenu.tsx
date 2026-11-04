@@ -1,7 +1,7 @@
 // 選んでいるセル（範囲）を長押しして出るメニュー（仕様書 17.2。下から出るシート）：
 // 切り取り・コピー・貼り付け・クリア／行を上に挿入・行を削除／複製・回転してよい／回転しない・仕上がった／まだ。
 // 回転と仕上がりは選んでいる行の部材全部に当て、押してもメニューは開いたまま（今の状態が見えるように）。ほかはメニューを閉じる。
-// 行を削除はいつも確かめる（ほかの部材の式が消す部材の寸法を使っていれば示す）。
+// 行を削除はいつも確かめる。
 // 計算は store の reducer（engine/clipboard/cells.ts など）に任せる。押せる／押せないの判定も engine の selectedPartIds を使う
 import { useState } from 'react'
 import { selectedPartIds } from '../../engine/clipboard/cells'
@@ -9,7 +9,6 @@ import { partLabel, partLabelAt } from '../../engine/parts'
 import type { CellClip, CellRange, Job } from '../../engine/types'
 import { currentJob, type ReduceResult, type StoreAction } from '../../store/reducer'
 import { clipText, flagState, pasteText } from '../cellSelect'
-import { referencingOthers } from '../partsTable'
 import { Segmented } from './Segmented'
 import { Sheet } from './Sheet'
 
@@ -105,19 +104,12 @@ export function CellMenu({ job, range, title, clip, dispatch, onClose, onNotice,
 
   const rotation = flagState(parts.map((p) => p.rotatable))
   const done = flagState(parts.map((p) => p.finishedDone))
-  const refs = confirm ? referencingOthers(job.parts, ids) : []
   const clipNow = clipText(clip)
 
   return (
     <Sheet title={title} onClose={onClose}>
       {confirm ? (
         <div className="confirm-box stack" role="alertdialog" aria-label="行を削除の確認">
-          {refs.length > 0 && (
-            <p className="confirm-text">
-              <b>{refs.map((r) => `${r.name}（${r.axes.join('・')}）`).join('・')}</b>{' '}
-              の式が、消す部材の寸法を使っています。削除すると、その式はエラーになります。
-            </p>
-          )}
           <p className="confirm-text">
             {ids.length === 1 ? (
               <>「{partLabelAt(parts[0], job.parts.indexOf(parts[0]))}」を削除しますか？</>
