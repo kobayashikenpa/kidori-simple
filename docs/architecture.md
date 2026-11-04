@@ -669,7 +669,7 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
 - `migrate/numbers.ts`：
   - `numberizeJob(job, adjusts)`・`numberizeJobs(jobs, adjusts)` → `{ job(s), report: NumberingReport }`。式（`isSizeInput` でない W・H）を、そのデータの調整寸法の一覧（`LegacyAdjust[]`。書きかけの行は使えない）で計算した仕上がり寸法の数字（小数第1位）にする。エラーは空にし `report.cleared`（`ClearedSize`：jobId・jobName・partName・axis・履歴なら history）に入れる。履歴の部材も、その履歴の中で計算する。式が無ければ同じ仕事を返す
   - `NumberingReport = { replaced, cleared }`・`NO_NUMBERING`・`mergeNumbering`・`numberingMessage(report)`（知らせの文）・`clipHasFormula(clip)`
-- 保存データ（`store/storage.ts`）：`readAppData(raw)` → `{ data, numbering }`（`parseAppData` は data だけ）。`loadSaved` は置き換えたら、元の文字を `BEFORE_NUMBERS_KEY_PREFIX`（`kidori-lite.data.v1.before-numbers`）＋日時の控えに残してから、置き換えたデータを保存し直す。控えを残せなければ保存しない（`canSave: false`）。`LoadResult.numbering`
+- 保存データ（`store/storage.ts`）：`readAppData(raw)` → `{ data, numbering }`（`parseAppData` は data だけ）。`loadSaved` は置き換えたら、元の文字を `BEFORE_NUMBERS_KEY_PREFIX`（`kidori-simple.data.v1.before-numbers`）＋日時の控えに残してから、置き換えたデータを保存し直す。控えを残せなければ保存しない（`canSave: false`）。`LoadResult.numbering`
 - ファイル（`transfer/importFile.ts`）：`importTransfer` はファイルの `adjusts` で置き換えてから足す。結果に `numbering`（仕事の名前・id は取り込んだあと）。調整寸法の一覧に足すのはやめた（`addedAdjusts` はなくした）
 - store：`StoreState.numbering`（保存しない）。`initialState` が `LoadResult.numbering` を入れ、`{ type: 'replaceData', data, numbering? }` でつなげ、`{ type: 'dismissNumbering' }` で消す
 
