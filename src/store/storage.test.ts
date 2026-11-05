@@ -434,3 +434,33 @@ describe('前のデータの式を数字に置き換える（第2.2版。仕様�
     expect(parseAppData(JSON.parse(JSON.stringify(legacy())))?.jobs[0].parts).toEqual(shelfJob().parts)
   })
 })
+
+describe('第2.3版（仕様書 27.4・27.6）', () => {
+  it('数字だけの式（450-50 など）の入った保存データは置き換えず、控えも作らず、書き直さない。式のまま読む', () => {
+    const st = new MemoryStorage()
+    const data = sample()
+    data.jobs[0].parts[3].expr = { W: '400-21', H: '1800-40' }
+    data.cellClip = { rows: 1, cols: 2, cells: [['450-50', '(900-18)/2']] }
+    const raw = JSON.stringify(data)
+    st.setItem(DATA_KEY, raw)
+    const r = loadSaved(st, NOW)
+    expect(r.numbering).toEqual({ replaced: false, cleared: [] })
+    expect(r.data).toEqual(data)
+    expect([...st.map.keys()].some((k) => k.startsWith(BEFORE_NUMBERS_KEY_PREFIX))).toBe(false)
+    expect(st.getItem(DATA_KEY)).toBe(raw)
+  })
+
+  it('前の版の保存データでも、数字だけの式の入ったアプリ内のコピーは捨てない', () => {
+    const st = new MemoryStorage()
+    const clip = { rows: 1, cols: 2, cells: [['棚板', '1800 - 40']] }
+    st.setItem(DATA_KEY, JSON.stringify({ ...sample(), adjusts: [], cellClip: clip }))
+    expect(loadSaved(st, NOW).data.cellClip).toEqual(clip)
+  })
+
+  it('保存してある仕事の切り代は変えない（初期値が 0 になっても 10 のまま）', () => {
+    const st = new MemoryStorage()
+    st.setItem(DATA_KEY, JSON.stringify(sample()))
+    expect(sample().jobs[0].settings.allowance).toBe(10)
+    expect(loadSaved(st, NOW).data.jobs[0].settings.allowance).toBe(10)
+  })
+})

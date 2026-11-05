@@ -59,7 +59,8 @@ describe('sheetChecklist（1片1行。切る順番に取り出される順）', 
   it('同じ工程で取り出される片（最後の切り分けの上と下）は、配置の順（上が先）', () => {
     // 4×8 の縦切り優先は長手を端切りしないので、長さ 2430 に 1227 + 3 + 1200 がぴったり：最後の切り分け1本で両方が取り出される
     const part = (id: string, H: number): Part => ({ id, name: id, expr: { W: '390', H: String(H - 10) }, quantity: 1, rotatable: false, finishedDone: false })
-    const job: Job = { ...createJob({ id: 'j', name: 'j', now: '2026-10-20T00:00:00.000Z' }), parts: [part('上', 1227), part('下', 1200)] }
+    const base = createJob({ id: 'j', name: 'j', now: '2026-10-20T00:00:00.000Z' })
+    const job: Job = { ...base, settings: { ...base.settings, allowance: 10 }, parts: [part('上', 1227), part('下', 1200)] }
     const [s] = pack(job).sheets
     expect(s.placements.map((p) => p.name)).toEqual(['上', '下'])
     const steps = pieceReleaseSteps(s)

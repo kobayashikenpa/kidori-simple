@@ -21,12 +21,12 @@ describe('defaultSheet（新しい仕事の板）', () => {
 })
 
 describe('defaultSettings（新しい仕事の設定）', () => {
-  it('4×8（1220×2430）・刃厚3・端切り5・切り代10・縦切り優先', () => {
+  it('4×8（1220×2430）・刃厚3・端切り5・切り代0（第2.3版。仕様書 27.6）・縦切り優先', () => {
     expect(defaultSettings()).toEqual({
       sheet: { sizeKind: 'shihachi', width: 1220, length: 2430 },
       kerf: 3,
       trim: 5,
-      allowance: 10,
+      allowance: 0,
       cutMode: 'vertical',
     })
   })

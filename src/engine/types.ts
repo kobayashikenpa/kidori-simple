@@ -40,7 +40,7 @@ export interface Settings {
    * 縦切り優先は右の長手だけ、横切り優先は下の長手と右の妻手を落とす
    */
   trim: number
-  /** 切り代（初期値 10）。W・H に同じ値を足す。部材ごとの上書きは無い */
+  /** 切り代（初期値 0。第2.3版 仕様書 27.6。第2.2版までは 10）。W・H に同じ値を足す。部材ごとの上書きは無い */
   allowance: number
   /** 切り方（初期値 縦切り優先） */
   cutMode: CutMode
@@ -50,7 +50,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Readonly<Omit<Settings, 'sheet'>> = {
   kerf: 3,
   trim: 5,
-  allowance: 10,
+  allowance: 0,
   cutMode: 'vertical',
 }
 

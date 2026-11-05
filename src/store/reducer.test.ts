@@ -84,7 +84,10 @@ describe('仕事の操作', () => {
       ['側板', '400', '700'],
       ['棚板', '379', '1760'],
     ])
-    const p = packJob(sample, computeDimensions(sample))
+    // 見本も新しい切り代の初期値 0（第2.3版。仕様書 27.6）。6章の例の並べ方は切り代 10 で確かめる
+    expect(sample.settings.allowance).toBe(0)
+    const at10 = { ...sample, settings: { ...sample.settings, allowance: 10 } }
+    const p = packJob(at10, computeDimensions(at10))
     expect(p.sheets).toHaveLength(2)
     expect(Math.round(p.yieldRate * 1000) / 10).toBe(57.2)
   })

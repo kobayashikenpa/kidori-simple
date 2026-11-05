@@ -21,6 +21,8 @@ describe('見本の仕事（仕様書 16.7・19.1。第2.2版から数字だけ�
     const job = sampleJob(T, ids())
     expect(job.name).toBe(SAMPLE_NAME)
     expect(job.settings).toEqual(defaultSettings())
+    // 切り代は新しい初期値の 0（第2.3版。仕様書 27.6）
+    expect(job.settings.allowance).toBe(0)
     expect(job.parts.map((p) => [p.name, p.expr.W, p.expr.H, p.quantity])).toEqual([
       ['天板', '400', '1800', 1],
       ['側板', '400', '700', 2],
@@ -28,8 +30,9 @@ describe('見本の仕事（仕様書 16.7・19.1。第2.2版から数字だけ�
     ])
   })
 
-  it('6章のテスト用の棚と同じ寸法・木取り（4×8・縦切り優先 2枚・57.2%）。前の版の式の見本と同じ並べ方', () => {
-    const job = sampleJob(T, ids())
+  it('切り代 10 にすると、6章のテスト用の棚と同じ寸法・木取り（4×8・縦切り優先 2枚・57.2%）。前の版の式の見本と同じ並べ方', () => {
+    const made = sampleJob(T, ids())
+    const job = { ...made, settings: { ...made.settings, allowance: 10 } }
     const dims = computeDimensions(job)
     expect(dims.errors).toEqual([])
     expect(dims.parts.map((d) => [d.name, d.finished, d.cut])).toEqual([

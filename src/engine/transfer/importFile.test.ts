@@ -238,3 +238,13 @@ describe('数字だけの式は、送るファイル・バックアップでも�
     expect(r.numbering).toEqual({ replaced: false, cleared: [] })
   })
 })
+
+describe('切り代の初期値 0（第2.3版。仕様書 27.6）', () => {
+  it('取り込んだ仕事の切り代は、ファイルの値のまま（10 は 10、0 は 0）', () => {
+    const at10 = importTransfer(receiver(), readFile(buildJobFile(shelfJob())), ids(), NOW)
+    expect(at10.data.jobs[1].settings.allowance).toBe(10)
+    const zero = shelfJob()
+    zero.settings.allowance = 0
+    expect(importTransfer(receiver(), readFile(buildJobFile(zero)), ids(), NOW).data.jobs[1].settings.allowance).toBe(0)
+  })
+})
