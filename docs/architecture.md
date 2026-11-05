@@ -704,3 +704,17 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
 
 - `DEFAULT_SETTINGS.allowance` を 10 → 0。新しい仕事（`defaultSettings`・`createJob`）と見本（`store/sample.ts`）がこの値を使う。保存してある仕事・取り込んだ仕事は、仕事の `settings.allowance` をそのまま読む（`shape.ts` は切り代の無い仕事を読めないとするので、初期値で埋めることは無い）
 - 6章の例（木取り 410×1810 など）を使うテストは、見本の仕事（`fixtures/shelf.ts`）で切り代 10 を指定する
+
+### 16.3 画面：式のキー・ƒ・表の上の欄（U-28。spec 27.1〜27.3）
+
+- キーは `ui/components/PadKeys.tsx`（6列 × 4段：全部消す 1 2 3 ÷ ⌫ ／ ◀ 4 5 6 × ▶ ／ ( 7 8 9 − ) ／ 閉じる 0（2列） . ＋ 次へ）。記号のキーは `onKey` に保存の形の半角（`+ - * / ( )`）を返す。枚数（`size={false}`）では記号・小数点・◀ ▶ を押せない
+- 編集は `ui/sizeEdit.ts` の `pressSizeKey`（`SizeKey` に `SizeOpKey` を足した）。入れたあとの形は engine の `isSizeInput`。1つの数は `SIZE_MAX_LEN`（8字）、式の全体は `SIZE_FORMULA_MAX_LEN`（30字）まで。数の始めの「.」は「0.」、余分な 0 は外す
+- キーの上の行・表の上の欄は engine の `sizeLabel` で × ÷ − の書き方にする（1字を1字に置き換えるので、カーソルの位置はそのまま）
+- ƒ：`PartsTable` の幅・長さのセルで、engine の `isSizeFormula(part.expr[axis])` なら右上に `.pt-fx`。値は今まで通り `computeDimensions` の結果
+- 表の上の欄：`ui/partsTable.ts` の `cellBarText(parts, range)`（範囲の左上のセルが幅・長さなら `sizeLabel(expr)`、ほかは ''）。`PartsTable` の `.pt-bar`（ボタン）。入力中は `cursor` の位置にカーソル。押すと `pressBar`（入力中・何も選んでいないときは何もしない。ほかは左上のセルで `startInput`）。表とキーの外を押したら入力を終える決まり（`useOutsideEnd`）では、欄は内側として扱う
+- 入力中のエラーは今まで通り `errorsWhileEditing`（engine の incomplete＝`450−`・`(900−18` などは出さない。0 で割る・0 以下は出す）
+
+### 16.4 画面：「幅」「長さ」（U-29。spec 27.5）
+
+- 列の画面の名前は `ui/cellSelect.ts` の `CELL_COL_LABEL`（名前・幅・長さ・枚数）。`PartsTable`（見出し・キーの上の行・並べ替え・長押しのメニュー）と `CutTable` が使う。板の辺の `AXIS_SIDE`（妻手・長手）は今まで通り
+- engine の `numberingMessage` は `AXIS_LABEL`（`migrate/numbers.ts`）で「本棚・棚板 幅」。`ClearedSize.axis` などデータの中は W・H のまま
