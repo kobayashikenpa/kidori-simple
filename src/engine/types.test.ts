@@ -8,8 +8,8 @@ describe('AXES', () => {
 })
 
 describe('DEFAULT_SETTINGS（仕事の設定の数値の初期値）', () => {
-  it('刃厚3・端切り5・切り代10・縦切り優先', () => {
-    expect(DEFAULT_SETTINGS).toEqual({ kerf: 3, trim: 5, allowance: 10, cutMode: 'vertical' })
+  it('刃厚3・端切り5・切り代0（第2.3版。仕様書 27.6。第2.2版までは 10）・縦切り優先', () => {
+    expect(DEFAULT_SETTINGS).toEqual({ kerf: 3, trim: 5, allowance: 0, cutMode: 'vertical' })
   })
 })
 

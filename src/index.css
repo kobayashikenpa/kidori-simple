@@ -786,13 +786,15 @@ h3 > .help {
   flex-direction: column;
   gap: 6px;
 }
-/* 部材の表のキー（第2.2版 仕様書 26.1）：5列 × 4段。数字は真ん中の3列。閉じる・次へ は2段。
-   第2.1版までの5段（式の段・( ) があった）と同じくらいの高さになるよう、キーを高くした */
+/* 部材の表のキー：第2.2版（仕様書 26.1）は 5列 × 4段の数字だけ。第2.3版（仕様書 27.2）で数字の右に ÷ × − ＋ の列を足し、
+   ( ) を 7 8 9 の段の両はしに置いて 6列 × 4段にした。高さは第2.2版と同じ（キー 56px） */
 .pad-keys.size-keys {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
 }
 .size-keys .pad-key {
   min-height: 56px;
+  min-width: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -809,11 +811,22 @@ h3 > .help {
   font-size: 22px;
   background: var(--surface);
 }
-.size-keys .pad-key.tall {
-  grid-row: span 2;
+/* 式の記号（＋ − × ÷ ( )）：数字と見分けやすいよう、仕上がりの色の字で */
+.size-keys .pad-key.op {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fin);
+  background: var(--fin-soft);
+}
+.size-keys .pad-key.op.paren {
+  font-family: var(--mono);
+}
+.size-keys .pad-key.two-line {
+  white-space: normal;
 }
 .size-keys .pad-key.done {
   background: var(--accent);
+  color: var(--accent-ink);
 }
 .pad-key-icon {
   font-size: 18px;
@@ -1600,17 +1613,6 @@ h3 > .help {
   color: var(--accent);
   font-weight: 700;
 }
-/* W・H の見出しは2段（W／妻手、H／長手。仕様書 18.4）。下の段は小さく */
-.pt-h2 {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.15;
-}
-.pt-h2-sub {
-  font-size: 10px;
-  font-weight: 400;
-}
 .pt-cell.rs {
   position: relative;
   opacity: 1 !important;
@@ -1782,6 +1784,54 @@ h3 > .help {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 表のすぐ上の1行の欄（第2.3版 仕様書 27.3）：選んだセルの 幅・長さ の中身だけ。高さはいつも同じで、表がずれない */
+.pt-bar {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  margin: 0 0 6px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fin);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.pt-bar.editing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.pt-bar-text {
+  white-space: pre;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fin);
+}
+/* 式の入ったセルの右上の小さな印（第2.3版 仕様書 27.1） */
+.pt-dim {
+  position: relative;
+}
+.pt-fx {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  pointer-events: none;
+}
+.pt-dim.bad .pt-fx {
+  color: var(--err);
 }
 /* 長押しのメニュー（仕様書 17.2） */
 .cm-group {

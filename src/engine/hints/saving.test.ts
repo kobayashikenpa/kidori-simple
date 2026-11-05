@@ -17,7 +17,7 @@ function part(id: string, W: string, H: string, quantity: number, rotatable = fa
  */
 function jobWith(w: number, quantity: number, settings: Partial<Settings> = {}): Job {
   const job = createJob({ id: 'job', name: '仕事', now: '2026-10-23T00:00:00.000Z' })
-  job.settings = { ...job.settings, sheet: { sizeKind: 'saburoku', width: 910, length: 1820 }, ...settings }
+  job.settings = { ...job.settings, sheet: { sizeKind: 'saburoku', width: 910, length: 1820 }, allowance: 10, ...settings }
   job.parts = [part('側板', String(w), '1800', quantity)]
   return job
 }
@@ -176,7 +176,8 @@ describe('仕様書 6章（19.1 の見本）の棚とお知らせ', () => {
   /** 19.1 の見本（全体なし）：天板 400×1800 ×1、側板 400×700 ×2、棚板 379×1760 ×3（第2.2版で数字だけに。前の版の式の値と同じ）。4×8 */
   function sampleJob(settings: Partial<Settings> = {}): Job {
     const job = createJob({ id: 'job-sample', name: '見本 棚', now: '2026-10-23T00:00:00.000Z' })
-    job.settings = { ...job.settings, ...settings }
+    // 6章の例は切り代 10（第2.3版で初期値は 0 になった。仕様書 27.6）
+    job.settings = { ...job.settings, allowance: 10, ...settings }
     job.parts = [
       part('天板', '400', '1800', 1),
       part('側板', '400', '700', 2),

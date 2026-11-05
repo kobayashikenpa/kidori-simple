@@ -688,3 +688,33 @@ export interface AdjustClip { rows: number; cols: number; cells: string[][]; cut
 - 表の W・H の欄は数字かエラーだけ（`ui/partCells.ts` の `dimCell(dims, axis, tab)`。式の表示・ƒ・色の枠はなくした）。行を削除の確認から、式で使われている部材の知らせ（`referencingOthers`）をなくした
 - 置き換えの知らせは `ui/App.tsx` の上の帯：`numberingMessage(state.numbering)` の文と「閉じる」（`dismissNumbering`）。エラーで空にしたものがあれば注意の色（warn）、無ければ ok の色。長いときは帯の中だけスクロール（高さは画面の 30% まで）
 
+## 16. 第2.3版の変更（仕様書 27章）
+
+### 16.1 数字だけの計算式（E-22。spec 27.1・27.4。`src/engine/size.ts`）
+
+- `Part.expr` の形（文字）は変えず、中身を「空・数字・数字と ＋ − × ÷ ( ) だけの式」にする。保存する式は `normalizeSizeText` でそろえた形（半角の数字と `+ - * / ( )`・空白なし。例 `(900-18)/2`）。キーで入れている途中の形（`12.`・`450-`・`(900-18`）も保存できる
+- 読み方は `readSize(text)`：数字はそのまま、数字だけの式は `formula/` の `parse`・`evaluate` で計算する（× ÷ が先・( ) が先・先頭や ( の直後の − は符号。値は丸めない）。部材の寸法・調整寸法の参照は、使える文字（数字・小数点・+ − × ÷ ( )・空白。全角と × ÷ −（U+2212）はそろえる）を先に確かめて受け付けない。「＝」も使えない
+  - エラー：syntax（計算できない式・使えない文字。終わりが記号・かっこが閉じていない・最後が「12.」は incomplete）、divideByZero（0 で割る）、nonPositive（結果を小数第1位に丸めて 0 以下。「計算結果が 0 以下になります（−50）」）
+  - parse の「後ろに数値か部材の寸法を入れてください」は `END_HINT` として外に出し、size.ts で「後ろに数字を入れてください」に言い換える
+- 画面用：`isSizeInput`（入れられる形か。途中の形も true）、`isSizeFormula`（式か。ƒ の印）、`sizeLabel`（`* / -` を `× ÷ −` に1字ずつ置き換えた表示。文字の位置は変わらない）、`sizeValueText`（表示する値。小数第1位。エラーは null）、`pastedSize`（貼り付け：数は数字の文字、値が 0 より大きい式は `normalizeSizeText` の形、ほかは undefined）
+- `computeDimensions`・`packJob`・履歴・送るファイル・バックアップ・コピー・オートフィルは、今のまま（式の文字をそのまま写し、計算は `readSize` の値）
+- 前のデータの置き換え（`migrate/numbers.ts`）：`isSizeInput` が false の W・H だけを置き換える。数字だけの式（途中の形・エラーの式も）はそのまま。先頭に「＝」の付いた数字・数字だけの式は「＝」を外してそろえた形にする（置き換えたことになる）。アプリ内のコピー（前の版の `cellClip`）は、部材の寸法・調整寸法・「＝」の入ったセルがあるときだけ捨てる（`clipHasFormula`）
+
+### 16.2 切り代の初期値 0（E-23。spec 27.6。`src/engine/types.ts`）
+
+- `DEFAULT_SETTINGS.allowance` を 10 → 0。新しい仕事（`defaultSettings`・`createJob`）と見本（`store/sample.ts`）がこの値を使う。保存してある仕事・取り込んだ仕事は、仕事の `settings.allowance` をそのまま読む（`shape.ts` は切り代の無い仕事を読めないとするので、初期値で埋めることは無い）
+- 6章の例（木取り 410×1810 など）を使うテストは、見本の仕事（`fixtures/shelf.ts`）で切り代 10 を指定する
+
+### 16.3 画面：式のキー・ƒ・表の上の欄（U-28。spec 27.1〜27.3）
+
+- キーは `ui/components/PadKeys.tsx`（6列 × 4段：全部消す 1 2 3 ÷ ⌫ ／ ◀ 4 5 6 × ▶ ／ ( 7 8 9 − ) ／ 閉じる 0（2列） . ＋ 次へ）。記号のキーは `onKey` に保存の形の半角（`+ - * / ( )`）を返す。枚数（`size={false}`）では記号・小数点・◀ ▶ を押せない
+- 編集は `ui/sizeEdit.ts` の `pressSizeKey`（`SizeKey` に `SizeOpKey` を足した）。入れたあとの形は engine の `isSizeInput`。1つの数は `SIZE_MAX_LEN`（8字）、式の全体は `SIZE_FORMULA_MAX_LEN`（30字）まで。数の始めの「.」は「0.」、余分な 0 は外す
+- キーの上の行・表の上の欄は engine の `sizeLabel` で × ÷ − の書き方にする（1字を1字に置き換えるので、カーソルの位置はそのまま）
+- ƒ：`PartsTable` の幅・長さのセルで、engine の `isSizeFormula(part.expr[axis])` なら右上に `.pt-fx`。値は今まで通り `computeDimensions` の結果
+- 表の上の欄：`ui/partsTable.ts` の `cellBarText(parts, range)`（範囲の左上のセルが幅・長さなら `sizeLabel(expr)`、ほかは ''）。`PartsTable` の `.pt-bar`（ボタン）。入力中は `cursor` の位置にカーソル。押すと `pressBar`（入力中・何も選んでいないときは何もしない。ほかは左上のセルで `startInput`）。表とキーの外を押したら入力を終える決まり（`useOutsideEnd`）では、欄は内側として扱う
+- 入力中のエラーは今まで通り `errorsWhileEditing`（engine の incomplete＝`450−`・`(900−18` などは出さない。0 で割る・0 以下は出す）
+
+### 16.4 画面：「幅」「長さ」（U-29。spec 27.5）
+
+- 列の画面の名前は `ui/cellSelect.ts` の `CELL_COL_LABEL`（名前・幅・長さ・枚数）。`PartsTable`（見出し・キーの上の行・並べ替え・長押しのメニュー）と `CutTable` が使う。板の辺の `AXIS_SIDE`（妻手・長手）は今まで通り
+- engine の `numberingMessage` は `AXIS_LABEL`（`migrate/numbers.ts`）で「本棚・棚板 幅」。`ClearedSize.axis` などデータの中は W・H のまま

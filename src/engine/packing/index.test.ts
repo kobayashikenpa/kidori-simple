@@ -25,6 +25,8 @@ function part(id: string, W: string, H: string, quantity = 1, rotatable = false)
 /** 見本の設定（4×8・刃厚3・端切り5・切り代10）で、指定の部材だけの仕事 */
 function jobOf(mode: CutMode, parts: Part[]): Job {
   const job = createJob({ id: 'job', name: '仕事', now: '2026-10-20T00:00:00.000Z' })
+  // 6章の例の切り代 10（第2.3版で初期値は 0 になった。仕様書 27.6）
+  job.settings.allowance = 10
   job.settings.cutMode = mode
   job.parts = parts
   return job

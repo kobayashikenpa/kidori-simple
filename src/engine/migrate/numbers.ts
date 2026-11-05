@@ -3,9 +3,11 @@
 //   そのときの仕上がり寸法（前の版の計算 legacyComputeDimensions と同じ値。小数第1位に丸める）の数字にする
 // - 調整寸法は、そのデータの中の調整寸法の一覧で計算する（保存データなら AppData.adjusts、ファイルならファイルの adjusts）
 // - 式がエラーで値が出ないもの（無い部材・削除した調整寸法・循環・0 以下 など）は空にして、知らせる一覧に入れる
-// 数字だけの W・H（キーで入れている途中の「12.」・空も）は式ではないので、そのまま残す（size.ts の isSizeInput）
+// 数字だけの W・H（キーで入れている途中の「12.」・空も）は式ではないので、そのまま残す（size.ts の isSizeInput）。
+// 第2.3版（仕様書 27.4）から、数字と ＋ − × ÷ ( ) だけの式（1800-40 など。途中の形・エラーの式も）もそのまま残す。
+// 先頭に「＝」の付いた数字・数字だけの式は「＝」を外して残す（暫定。第2.3版の W・H には「＝」を使えないため）
 import { partLabelAt } from '../parts'
-import { isSizeInput, sizeText } from '../size'
+import { isSizeFormula, isSizeInput, normalizeSizeText, sizeText } from '../size'
 import { AXES, type Adjust, type Axis, type CellClip, type HistoryEntry, type Job, type Part, type Settings } from '../types'
 import { legacyComputeDimensions } from './legacyDimensions'
 
@@ -42,8 +44,25 @@ function usableOf(rows: readonly LegacyAdjust[]): Adjust[] {
   return rows.filter((r): r is Adjust => r.name.trim() !== '' && r.value !== null && Number.isFinite(r.value) && r.value > 0)
 }
 
-/** W・H の文字が式か（数字だけの形でない） */
+/** W・H の文字が置き換える式か（数字・数字だけの式の形でない。部材の寸法・調整寸法・「＝」などを使っている） */
 const isFormula = (text: string): boolean => !isSizeInput(text)
+
+/**
+ * 残す数字だけの式が、保存の形（半角・空白なし。normalizeSizeText）にそろっていないか（例：「1800 - 40」「１８００×２」）。
+ * そろえるだけなので、置き換えには数えない（知らせ・控えは出さない）
+ */
+const needsTidy = (text: string): boolean => isSizeFormula(text) && normalizeSizeText(text) !== text
+
+/**
+ * 先頭に「＝」（全角・半角）の付いた、数字・数字だけの式なら、「＝」を外してそろえた形（例：「＝1800 − 40」→「1800-40」）。
+ * それ以外（「＝」が無い・「＝」だけ・後ろに部材の寸法などがある）は null
+ */
+function withoutEquals(text: string): string | null {
+  const m = /^\s*=(.*)$/su.exec(text.normalize('NFKC'))
+  if (!m) return null
+  const rest = m[1]
+  return rest.trim() !== '' && isSizeInput(rest) ? normalizeSizeText(rest) : null
+}
 
 type SizePart = Pick<Part, 'name' | 'expr'>
 
@@ -55,17 +74,33 @@ function numberizeParts<P extends SizePart>(
   parts: readonly P[],
   settings: Settings,
   adjusts: readonly Adjust[],
-): { parts: P[]; cleared: { partName: string; axis: Axis }[]; changed: boolean } {
-  if (!parts.some((p) => AXES.some((a) => isFormula(p.expr[a])))) return { parts: parts as P[], cleared: [], changed: false }
+): { parts: P[]; cleared: { partName: string; axis: Axis }[]; changed: boolean; tidied: boolean } {
+  if (!parts.some((p) => AXES.some((a) => isFormula(p.expr[a])))) {
+    // 置き換える式が無くても、数字だけの式の書き方はそろえる
+    if (!parts.some((p) => AXES.some((a) => needsTidy(p.expr[a])))) return { parts: parts as P[], cleared: [], changed: false, tidied: false }
+    const tidy = parts.map((p) =>
+      AXES.some((a) => needsTidy(p.expr[a])) ? { ...p, expr: { W: needsTidy(p.expr.W) ? normalizeSizeText(p.expr.W) : p.expr.W, H: needsTidy(p.expr.H) ? normalizeSizeText(p.expr.H) : p.expr.H } } : p,
+    )
+    return { parts: tidy, cleared: [], changed: false, tidied: true }
+  }
   // 履歴の部材は id を持たないので、並びの位置で id を振って前の版の計算に渡す
   const calc = parts.map((p, i): Part => ({ id: `p${i}`, name: p.name, expr: p.expr, quantity: 1, rotatable: false, finishedDone: false }))
   const dims = legacyComputeDimensions({ parts: calc, settings }, adjusts)
   const cleared: { partName: string; axis: Axis }[] = []
   const out = parts.map((p, i) => {
-    if (!AXES.some((a) => isFormula(p.expr[a]))) return p
+    if (!AXES.some((a) => isFormula(p.expr[a]) || needsTidy(p.expr[a]))) return p
     const expr = { ...p.expr }
     for (const a of AXES) {
+      if (needsTidy(p.expr[a])) {
+        expr[a] = normalizeSizeText(p.expr[a])
+        continue
+      }
       if (!isFormula(p.expr[a])) continue
+      const kept = withoutEquals(p.expr[a])
+      if (kept !== null) {
+        expr[a] = kept
+        continue
+      }
       const v = dims.parts[i].finishedByAxis[a]
       if (v === undefined) {
         expr[a] = ''
@@ -76,7 +111,7 @@ function numberizeParts<P extends SizePart>(
     }
     return { ...p, expr }
   })
-  return { parts: out, cleared, changed: true }
+  return { parts: out, cleared, changed: true, tidied: false }
 }
 
 /**
@@ -89,16 +124,25 @@ export function numberizeJob(job: Job, adjusts: readonly LegacyAdjust[]): { job:
   const now = numberizeParts(job.parts, job.settings, usable)
   const cleared: ClearedSize[] = now.cleared.map((c) => ({ jobId: job.id, jobName: job.name, ...c }))
   let historyChanged = false
+  let historyTidied = false
   const history = job.history.map((h) => {
     const r = numberizeParts(h.parts, h.settings, usable)
+    if (r.tidied) {
+      historyTidied = true
+      return { ...h, parts: r.parts }
+    }
     if (!r.changed) return h
     historyChanged = true
     for (const c of r.cleared) cleared.push({ jobId: job.id, jobName: job.name, ...c, history: { id: h.id, savedAt: h.savedAt, memo: h.memo } })
     return { ...h, parts: r.parts }
   })
-  if (!now.changed && !historyChanged) return { job, report: NO_NUMBERING }
+  if (!now.changed && !historyChanged) {
+    // 数字だけの式の書き方をそろえただけなら、置き換えには数えない
+    if (!now.tidied && !historyTidied) return { job, report: NO_NUMBERING }
+    return { job: { ...job, parts: now.parts, history: historyTidied ? history : job.history }, report: NO_NUMBERING }
+  }
   return {
-    job: { ...job, parts: now.parts, history: historyChanged ? history : job.history },
+    job: { ...job, parts: now.parts, history: historyChanged || historyTidied ? history : job.history },
     report: { replaced: true, cleared },
   }
 }
@@ -124,24 +168,30 @@ export function mergeNumbering(a: NumberingReport, b: NumberingReport): Numberin
   return { replaced: true, cleared: [...a.cleared, ...b.cleared] }
 }
 
-/** セルの文字が式か（部材の寸法・調整寸法・計算の記号・「＝」が入っている）。名前・数字・空は式ではない */
+/**
+ * セルの文字が置き換える式か（部材の寸法・調整寸法・「＝」などが入っている）。名前・数字・空・数字だけの式（第2.3版）は式ではない
+ */
 function looksLikeFormula(text: string): boolean {
   const t = text.normalize('NFKC').trim()
-  if (t === '' || /^\d*\.?\d*$/.test(t)) return false
+  if (t === '' || isSizeInput(t)) return false
   return /[+\-*/().{}=\s×✕÷−–—]/u.test(t)
 }
 
 /**
- * アプリの中でコピーしておいたセル（AppData.cellClip）に式が入っているか（仕様書 26.4：入っていればそのコピーは捨てる）。
- * コピーには列の位置が無いので、セルの文字で見分ける（名前には式の記号を使えなかったので、記号の入ったセルは式）
+ * アプリの中でコピーしておいたセル（AppData.cellClip）に、置き換える式が入っているか（仕様書 26.4：入っていればそのコピーは捨てる）。
+ * 数字だけの式（1800 - 40 など）は第2.3版でそのまま使えるので捨てない（仕様書 27.4）。
+ * コピーには列の位置が無いので、セルの文字で見分ける（前の版の名前には式の記号を使えなかったので、記号の入ったセルは式）
  */
 export function clipHasFormula(clip: CellClip): boolean {
   return clip.cells.some((row) => row.some(looksLikeFormula))
 }
 
-/** 知らせる一覧の1つ：「本棚・棚板 W」（履歴の中なら「（履歴）」を付ける） */
+/** 画面での寸法の呼び方（第2.3版 仕様書 27.5：W は「幅」、H は「長さ」） */
+const AXIS_LABEL: Record<Axis, string> = { W: '幅', H: '長さ' }
+
+/** 知らせる一覧の1つ：「本棚・棚板 幅」（履歴の中なら「（履歴）」を付ける） */
 function clearedLabel(c: ClearedSize): string {
-  return `${c.jobName}・${c.partName} ${c.axis}${c.history ? '（履歴）' : ''}`
+  return `${c.jobName}・${c.partName} ${AXIS_LABEL[c.axis]}${c.history ? '（履歴）' : ''}`
 }
 
 /**

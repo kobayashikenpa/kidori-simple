@@ -144,7 +144,7 @@ export function BoardSettings({ job, compare, result, empty, dispatch }: Props) 
           </div>
           <div className="field">
             <Help title={<span className="label cut-ink">切り代</span>}>
-              あとで削り仕上げるための余分です。木取り寸法 ＝ 仕上がり寸法 ＋ 切り代（W・H に同じだけ足す）。部材の画面の［木取り］のタブでも変えられます（どちらで変えても同じ値です）。
+              あとで削り仕上げるための余分です。木取り寸法 ＝ 仕上がり寸法 ＋ 切り代（幅・長さに同じだけ足す）。部材の画面の［木取り］のタブでも変えられます（どちらで変えても同じ値です）。
             </Help>
             <NumberField label="切り代" value={s.allowance} onCommit={commitNum('allowance')} onError={setNumError} />
           </div>

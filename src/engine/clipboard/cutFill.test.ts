@@ -245,6 +245,17 @@ describe('オートフィル', () => {
     expect(r.job.parts.slice(4).map((p) => p.id)).toEqual(['part-new1', 'part-new2', 'part-new3'])
   })
 
+  it('式のセルを引くと、式のまま入る（第2.3版。仕様書 27.4）', () => {
+    const job = jobOf('job-a', part('a', 'A', '450-50', '1800/2'), part('b', 'B', '30', '40'))
+    const r = ok(fillCells(job, R(0, 1, 1, 2), R(0, 1, 3, 2), ids()))
+    expect(r.skipped).toEqual([])
+    expect(table(r.job).map((x) => [x[1], x[2]])).toEqual([
+      ['450-50', '1800/2'],
+      ['450-50', '1800/2'],
+      ['450-50', '1800/2'],
+    ])
+  })
+
   it('引いた先は、元を除いた所だけでもよい', () => {
     const r = ok(fillCells(job4(), R(0, 1, 2, 1), R(2, 1, 2, 1), ids()))
     expect(table(r.job).map((x) => x[1])).toEqual(['10', '30', '10', '30'])

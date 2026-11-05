@@ -220,3 +220,16 @@ describe('copyHistory（仕事のコピー用の写し）', () => {
     expect(src[0].settings.sheet.width).toBe(1220)
   })
 })
+
+describe('数字だけの式（第2.3版。仕様書 27.4）', () => {
+  it('履歴には式のまま残し、戻すと式のまま戻る。結果は式の値で計算する', () => {
+    const job = shelfJob()
+    job.parts[3].expr = { W: '400-21', H: '1800-40' }
+    const e = historyEntry(job, resultOf(job), { id: 'h-1', memo: '', now: T0 })
+    expect(e.parts[3].expr).toEqual({ W: '400-21', H: '1800-40' })
+    expect(e.sheetCount).toBe(resultOf(shelfJob()).sheetCount)
+    expect(e.yieldRate).toBe(resultOf(shelfJob()).yieldRate)
+    const back = okJob(restoreHistory(okJob(addHistory(job, e)), 'h-1', counter()))
+    expect(back.parts[3].expr).toEqual({ W: '400-21', H: '1800-40' })
+  })
+})

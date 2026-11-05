@@ -2,8 +2,8 @@
 // 範囲（四角）・切り取り・オートフィル（第1.3版。仕様書 17.3・17.4）。新しく作ったもの（kidori には無い）。
 // - セルの位置は { row: 表の行（0 から。job.parts の位置。部材の数以上は空の行）, col: 名前・W・H・枚数 }
 // - 選んだセルは、セルの配列か四角い範囲（CellRange）のどちらでも渡せる（CellSelection）
-// - コピーは「1つのセル」か「四角い範囲（続いた行 × 続いた列）」だけ。中身は文字のまま（W・H は数字の文字、枚数は数字の文字）
-// - 貼り付けは中身の上書き。W・H には数字だけ貼る（第2.2版。仕様書 26.1）。名前は書いたまま貼る（同じ名前でもよい・番号は振らない。仕様書 26.3）
+// - コピーは「1つのセル」か「四角い範囲（続いた行 × 続いた列）」だけ。中身は文字のまま（W・H は数字か数字だけの式の文字、枚数は数字の文字）
+// - 貼り付けは中身の上書き。W・H には数字か数字だけの式を貼る（式は式のまま。第2.3版。仕様書 27.4）。名前は書いたまま貼る（同じ名前でもよい・番号は振らない。仕様書 26.3）
 // 仕事は書き換えず、新しい仕事を返す（updatedAt とコピーしたセル AppData.cellClip の保存は store の側で行う）
 import { normalizeFormulaText } from '../formula/tokenize'
 import { isBlankPart } from '../parts'
@@ -12,7 +12,7 @@ import { CELL_COLS, type CellClip, type CellCol, type CellPos, type CellRange, t
 
 export const COPY_SHAPE_MESSAGE = 'コピーは1つのセルか、四角い範囲を選んでください'
 export const NOT_QUANTITY_MESSAGE = '枚数には 0 以上の整数だけ貼れます'
-export const NOT_SIZE_MESSAGE = 'W・H には 0 より大きい数だけ貼れます'
+export const NOT_SIZE_MESSAGE = '幅・長さには、0 より大きい数か、数字の式だけ貼れます'
 export const FILL_RANGE_MESSAGE = '引く元の範囲を選んでください'
 
 /** 選んだセル：セルの配列か、四角い範囲（第1.3版。画面は四角で持つ） */
@@ -131,7 +131,7 @@ export function cutCells(job: Pick<Job, 'id' | 'parts'>, selected: CellSelection
 }
 
 /**
- * 貼れなかった理由。notQuantity：枚数に 0 以上の整数でないもの / notSize：W・H に 0 より大きい数でないもの（式・名前の文字・0）。
+ * 貼れなかった理由。notQuantity：枚数に 0 以上の整数でないもの / notSize：W・H に 0 より大きい数・値が 0 より大きい数字だけの式でないもの（部材の寸法・名前の文字・0 以下・計算できない式）。
  * 第2.2版（仕様書 26.3）で名前は何でも貼れるようにした（invalidName と、番号を振ったセル renamed はなくした）
  */
 export type PasteSkipReason = 'notQuantity' | 'notSize'
@@ -301,7 +301,8 @@ function sameAsClip(job: Pick<Job, 'parts'>, clip: CellClip, cell: CellPos): boo
  * - 範囲のコピー：選んだセルの一番左上（いちばん上の行・いちばん左の列）から同じ形で貼る。表の右（枚数）をはみ出す列は貼らない
  * - 空の行に貼ると部材を作る（id は newId('part')、枚数は空から、回転しない）。途中の空の行も、部材の後ろに上から詰めて足す（暫定）
  * - 名前：前後の空白を外して書いたまま入れる。同じ名前になってもよく、番号は振らない（第2.2版。仕様書 26.3）
- * - 枚数：0 以上の整数だけ（空は空にする）。W・H：0 より大きい数だけ（全角・余分な 0 はそろえる。空は空にする。式・名前の文字・0 は notSize。第2.2版）
+ * - 枚数：0 以上の整数だけ（空は空にする）。W・H：0 より大きい数（全角・余分な 0 はそろえる）か、値が 0 より大きい数字だけの式（式のまま。
+ *   size.ts の normalizeSizeText でそろえる）。空は空にする。部材の寸法・名前の文字・0 以下・計算できない式は notSize（第2.3版。size.ts の pastedSize）
  * - 貼って行の全部の欄が空になった部材は消す。1つも貼れなかったときは同じ仕事を返す
  * - 切り取り（clip.cut）：元のセルを空にする（第1.3版）。貼る先と重なるセル・1つも貼れなかったクリップの位置・
  *   切り取ったあとに書き換えたセルは空にしない。同じ仕事なら返す job の中で空にし、

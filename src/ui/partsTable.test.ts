@@ -18,6 +18,7 @@ import {
   sessionTableMinRows,
   setSessionTableMinRows,
   errorsWhileEditing,
+  cellBarText,
 } from './partsTable'
 
 describe('部材の表の行（仕様書 15.1）', () => {
@@ -143,5 +144,52 @@ describe('入力中のセルのエラー（仕様書 26.1）', () => {
   it('0 以下・数字でないものは出す', () => {
     const shown = [err('nonPositive'), err('syntax')]
     expect(errorsWhileEditing(shown)).toEqual(shown)
+  })
+})
+
+describe('入力中の式のエラー（第2.3版。仕様書 27.1）', () => {
+  const editingErrors = (W: string) => {
+    const job = shelfJob()
+    job.parts[3].expr.W = W
+    const d = computeDimensions(job).parts.find((x) => x.partId === job.parts[3].id)
+    return errorsWhileEditing(d?.errors.filter((e) => e.axis === 'W') ?? []).map((e) => e.message)
+  }
+  it('入れている途中の形（終わりが記号・かっこが閉じていない）は出さない', () => {
+    expect(editingErrors('450-')).toEqual([])
+    expect(editingErrors('(900-18')).toEqual([])
+  })
+  it('0 で割る・0 以下になる式は出す', () => {
+    expect(editingErrors('1/0')).toEqual(['0 で割っています'])
+    expect(editingErrors('50-100')).toEqual(['計算結果が 0 以下になります（−50）'])
+  })
+  it('計算できる式はエラーなし', () => {
+    expect(editingErrors('450-50')).toEqual([])
+  })
+})
+
+describe('表の上の欄（第2.3版。仕様書 27.3）', () => {
+  const parts = () => {
+    const job = shelfJob()
+    job.parts[3].expr.W = '400-21'
+    job.parts[3].expr.H = '(1800-40)/1'
+    return job.parts
+  }
+  const cell = (top: number, left: number, rows = 1, cols = 1) => ({ top, left, rows, cols })
+  it('幅・長さのセルは、そのセルの中身だけ（式は × ÷ − の書き方、数字はそのまま）', () => {
+    expect(cellBarText(parts(), cell(3, 1))).toBe('400−21')
+    expect(cellBarText(parts(), cell(3, 2))).toBe('(1800−40)÷1')
+    expect(cellBarText(parts(), cell(0, 1))).toBe('400')
+  })
+  it('何も選んでいない・名前・枚数のセル・空の行は空', () => {
+    expect(cellBarText(parts(), null)).toBe('')
+    expect(cellBarText(parts(), cell(3, 0))).toBe('')
+    expect(cellBarText(parts(), cell(3, 3))).toBe('')
+    expect(cellBarText(parts(), cell(4, 1))).toBe('')
+  })
+  it('範囲・行・列を選んだら左上のセル', () => {
+    expect(cellBarText(parts(), cell(3, 1, 1, 2))).toBe('400−21')
+    expect(cellBarText(parts(), cell(2, 2, 2, 2))).toBe('700')
+    // 行全体は左上が名前なので空
+    expect(cellBarText(parts(), cell(3, 0, 1, 4))).toBe('')
   })
 })

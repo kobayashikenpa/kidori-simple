@@ -134,4 +134,4 @@ export function hasPartCell(cells: readonly CellPos[], partCount: number): boole
   return cells.some((c) => c.row < partCount)
 }
 
-export const CELL_COL_LABEL: Record<CellCol, string> = { name: '名前', W: 'W', H: 'H', qty: '枚数' }
+export const CELL_COL_LABEL: Record<CellCol, string> = { name: '名前', W: '幅', H: '長さ', qty: '枚数' }

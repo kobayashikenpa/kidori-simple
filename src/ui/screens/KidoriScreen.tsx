@@ -332,7 +332,7 @@ function SheetCard({ entry, count, colorOf, labelOf, error, onToggle }: SheetCar
             済（切った部材）
           </span>
         )}
-        <span>寸法は W×H（木取り寸法）</span>
+        <span>寸法は 幅×長さ（木取り寸法）</span>
       </p>
       <div className="kd-scraps">
         <span className="kd-scraps-h">端材</span>

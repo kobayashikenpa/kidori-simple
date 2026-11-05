@@ -23,7 +23,7 @@ export function customSheet(a: number, b: number): Sheet {
   return normalizeSheet({ sizeKind: 'custom', width: a, length: b })
 }
 
-/** 新しい仕事の設定：4×8・刃厚3・端切り5・切り代10・縦切り優先。呼ぶたびに新しいオブジェクト */
+/** 新しい仕事の設定：4×8・刃厚3・端切り5・切り代0（第2.3版）・縦切り優先。呼ぶたびに新しいオブジェクト */
 export function defaultSettings(): Settings {
   return { sheet: defaultSheet(), ...DEFAULT_SETTINGS }
 }

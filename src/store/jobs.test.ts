@@ -42,6 +42,8 @@ describe('仕事', () => {
     const job = makeJob('  ', NOW, 'job-1')
     expect(job.name).toBe('10/21')
     expect(job.settings).toEqual(defaultSettings())
+    // 切り代の初期値は 0（第2.3版。仕様書 27.6）
+    expect(job.settings.allowance).toBe(0)
     expect(job.parts).toEqual([])
     expect(job.createdAt).toBe(NOW.toISOString())
     expect(makeJob(' 食器棚 ', NOW, 'job-2').name).toBe('食器棚')
