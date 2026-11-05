@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { shelfJob } from '../fixtures/shelf'
 import type { Axis, Job, Part } from '../types'
+import { packJob } from '../packing'
 import { computeDimensions } from './index'
 
 function mkPart(name: string, expr: Partial<Record<Axis, string>>, extra: Partial<Part> = {}): Part {
@@ -103,10 +104,12 @@ describe('エラー（数字でない・0 以下・空）', () => {
     expect(dimsOf(withParts(mkPart('X', { H: '12.' })), 'X').errors[0]).toMatchObject({ axis: 'H', kind: 'syntax', incomplete: true })
   })
 
-  it('式（前の版の書き方）は使えない（syntax・途中の印なし）', () => {
+  it('部材の寸法を使った式（前の版の書き方）は使えない（syntax・途中の印なし）', () => {
     const d = dimsOf(withParts(mkPart('X', { W: '天板.W - 20' })), 'X')
     expect(d.finished).toBeNull()
-    expect(d.errors).toEqual([{ partId: 'id-X', axis: 'W', kind: 'syntax', message: '「天板.W - 20」は使えません（W・H は数字だけです）' }])
+    expect(d.errors).toEqual([
+      { partId: 'id-X', axis: 'W', kind: 'syntax', message: '「天板.W - 20」は使えません（幅・長さは、数字と ＋ − × ÷ ( ) の式だけです）' },
+    ])
   })
 
   it('0.1 のように小さくても正なら計算する', () => {
@@ -128,5 +131,37 @@ describe('エラー（数字でない・0 以下・空）', () => {
     const job = shelfJob()
     job.parts[0].expr.H = '1500'
     expect(dimsOf(job, '天板').finished).toEqual({ W: 400, H: 1800 })
+  })
+})
+
+describe('computeDimensions：数字だけの式（第2.3版。仕様書 27.1）', () => {
+  it('仕上がり ＝ 式の値、木取り ＝ 式の値 ＋ 切り代（見本の切り代 10）', () => {
+    const d = dimsOf(withParts(mkPart('X', { W: '450-50', H: '(1800-40)' })), 'X')
+    expect(d.errors).toEqual([])
+    expect(d.finished).toEqual({ W: 400, H: 1760 })
+    expect(d.cut).toEqual({ W: 410, H: 1770 })
+  })
+
+  it('× ÷ が先・( ) が先。全角の記号も読む', () => {
+    const d = dimsOf(withParts(mkPart('X', { W: '(900－18)÷2', H: '600+300×4' })), 'X')
+    expect(d.finished).toEqual({ W: 441, H: 1800 })
+  })
+
+  it('0 で割る・結果が 0 以下・計算できない式はその軸だけエラー（もう片方は出す）', () => {
+    expect(dimsOf(withParts(mkPart('X', { W: '400/0' })), 'X').errors).toEqual([{ partId: 'id-X', axis: 'W', kind: 'divideByZero', message: '0 で割っています' }])
+    const neg = dimsOf(withParts(mkPart('X', { H: '50-100' })), 'X')
+    expect(neg.errors).toEqual([{ partId: 'id-X', axis: 'H', kind: 'nonPositive', message: '計算結果が 0 以下になります（−50）' }])
+    expect(neg.finishedByAxis).toEqual({ W: 100 })
+    expect(dimsOf(withParts(mkPart('X', { W: '450-' })), 'X').errors[0]).toMatchObject({ axis: 'W', kind: 'syntax', incomplete: true })
+    expect(dimsOf(withParts(mkPart('X', { W: '450+*2' })), 'X').errors[0]).toMatchObject({ axis: 'W', kind: 'syntax' })
+    expect(dimsOf(withParts(mkPart('X', { W: '450+*2' })), 'X').errors[0].incomplete).toBeUndefined()
+  })
+})
+
+describe('並べ方は式の値で今までどおり（第2.3版）', () => {
+  it('見本の棚を式で入れても、数字で入れたときと同じ並べ方になる', () => {
+    const job = shelfJob()
+    job.parts = job.parts.map((p) => ({ ...p, expr: { W: `${p.expr.W}+50-50`, H: `(${p.expr.H}*2)/2` } }))
+    expect(packJob(job, computeDimensions(job))).toEqual(packJob(shelfJob(), computeDimensions(shelfJob())))
   })
 })

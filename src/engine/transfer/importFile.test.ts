@@ -209,3 +209,32 @@ describe('前の版のファイルの式を数字に置き換える（第2.2版�
     expect(importTransfer(receiver(), file, ids(), NOW).numbering).toEqual({ replaced: false, cleared: [] })
   })
 })
+
+describe('数字だけの式は、送るファイル・バックアップでも式のまま（第2.3版。仕様書 27.4）', () => {
+  /** 天板・棚板を式で入れた見本の棚 */
+  function formulaShelf(id = 'job-f', name = '式の棚'): Job {
+    const job = shelfJob(id, name)
+    job.parts[1].expr = { W: '450-50', H: '1800' }
+    job.parts[3].expr = { W: '400-21', H: '(1800-40)' }
+    return job
+  }
+
+  it('送るファイル：式のまま書き出し、式のまま取り込む（置き換えの知らせは出ない）', () => {
+    const src = formulaShelf()
+    const file = readFile(buildJobFile(src))
+    expect(file.kind === 'job' && file.job.parts[3].expr).toEqual({ W: '400-21', H: '(1800-40)' })
+    const r = importTransfer(receiver(), file, ids(), NOW)
+    expect(r.data.jobs[1].parts.map((p) => p.expr)).toEqual(src.parts.map((p) => p.expr))
+    expect(r.numbering).toEqual({ replaced: false, cleared: [] })
+    expect(dimsOf(r.data.jobs[1])).toEqual(dimsOf(shelfJob()))
+  })
+
+  it('バックアップ：今の部材も履歴の部材も式のまま', () => {
+    const src = withHistory(formulaShelf(), 'h-1', '式で入れた')
+    const r = importTransfer(receiver(), readFile(buildBackupFile({ jobs: [src] })), ids(), NOW)
+    const got = r.data.jobs[1]
+    expect(got.parts.map((p) => p.expr)).toEqual(src.parts.map((p) => p.expr))
+    expect(got.history[0].parts.map((p) => p.expr)).toEqual(src.parts.map((p) => p.expr))
+    expect(r.numbering).toEqual({ replaced: false, cleared: [] })
+  })
+})

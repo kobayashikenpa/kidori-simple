@@ -1,4 +1,4 @@
-// 前のデータの式を数字に置き換える（第2.2版。仕様書 26.4）
+// 前のデータの式を数字に置き換える（第2.2版。仕様書 26.4）。第2.3版（仕様書 27.4）から数字だけの式はそのまま残す
 import { describe, expect, it } from 'vitest'
 import { computeDimensions } from '../dimensions'
 import { legacyShelfJob, MELAMINE_ID, shelfAdjusts, shelfJob } from '../fixtures/shelf'
@@ -57,9 +57,11 @@ describe('numberizeJob（仕事の W・H の式を仕上がり寸法の数字に
     expect(report.cleared).toEqual([{ jobId: 'job-shelf', jobName: '棚', partName: '棚板', axis: 'W' }])
   })
 
-  it('値は小数第1位に丸める（1000 / 3 → 333.3）', () => {
-    const job = { ...shelfJob(), parts: [part('a', 'A', '1000 / 3', '0.1 + 0.2')] }
-    expect(numberizeJob(job, []).job.parts[0].expr).toEqual({ W: '333.3', H: '0.3' })
+  it('値は小数第1位に丸める（A.W ＝ 1000 / 3 → 333.3）。数字だけの式の A はそのまま', () => {
+    const job = { ...shelfJob(), parts: [part('a', 'A', '1000 / 3', '0.1 + 0.2'), part('b', 'B', 'A.W', 'A.H')] }
+    const out = numberizeJob(job, []).job
+    expect(out.parts[0].expr).toEqual({ W: '1000 / 3', H: '0.1 + 0.2' })
+    expect(out.parts[1].expr).toEqual({ W: '333.3', H: '0.3' })
   })
 
   it('エラーの式は空にして、仕事名・部材名（空なら #行番号）・W/H を返す。参照先のエラーで計算できない式も空にする', () => {
@@ -70,24 +72,46 @@ describe('numberizeJob（仕事の W・H の式を仕上がり寸法の数字に
         part('b', '', '天板.H - 20', '0'),
         part('c', '扉', '1 / 0', '1800 - 2000'),
         part('d', '棚', '300 +', '{n:gone}'),
+        part('e', '戸', '扉.W', '扉.H + 1000'),
       ],
     }
     const { job: out, report } = numberizeJob(job, shelfAdjusts())
+    // 数字だけの式（1 / 0・1800 - 2000・300 +）はエラーでもそのまま残す（第2.3版。開いたあとに画面で直せる）
     expect(sizes(out)).toEqual([
       ['天板', '600', ''],
       ['', '', '0'],
-      ['扉', '', ''],
-      ['棚', '', ''],
+      ['扉', '1 / 0', '1800 - 2000'],
+      ['棚', '300 +', ''],
+      ['戸', '', ''],
     ])
     expect(report.replaced).toBe(true)
     expect(report.cleared.map((c) => [c.jobName, c.partName, c.axis])).toEqual([
       ['本棚', '天板', 'H'],
       ['本棚', '#2', 'W'],
-      ['本棚', '扉', 'W'],
-      ['本棚', '扉', 'H'],
-      ['本棚', '棚', 'W'],
       ['本棚', '棚', 'H'],
+      ['本棚', '戸', 'W'],
+      ['本棚', '戸', 'H'],
     ])
+  })
+
+  it('数字だけの式（1800-40 など）はそのまま残す（第2.3版。仕様書 27.4）。途中の形・エラーの式も', () => {
+    const job = {
+      ...shelfJob(),
+      parts: [part('a', 'A', '1800-40', '(900-18)/2'), part('b', 'B', '1800 − 40', '450×2'), part('c', 'C', '450-', '1/0'), part('d', 'D', '（９００）', '-5')],
+    }
+    const r = numberizeJob(job, [])
+    expect(r.job).toBe(job)
+    expect(r.report).toEqual({ replaced: false, cleared: [] })
+  })
+
+  it('部材の寸法を使った式は、数字だけの式の値で計算して数字にする（数字だけの式はそのまま）', () => {
+    const job = { ...shelfJob(), parts: [part('a', '天板', '450-50', '1800-40'), part('b', '棚板', '天板.W - 21', '天板.H')] }
+    const r = numberizeJob(job, [])
+    expect(sizes(r.job)).toEqual([
+      ['天板', '450-50', '1800-40'],
+      ['棚板', '379', '1760'],
+    ])
+    expect(r.report).toEqual({ replaced: true, cleared: [] })
   })
 
   it('数字だけ・空の W・H はそのまま（0 も数字なので空にしない。一覧にも入れない）', () => {
@@ -97,11 +121,22 @@ describe('numberizeJob（仕事の W・H の式を仕上がり寸法の数字に
     expect(r.report).toEqual({ replaced: false, cleared: [] })
   })
 
-  it('先頭に「＝」の付いた式・全角の数字も数字にする', () => {
-    const job = { ...shelfJob(), parts: [part('a', 'A', '＝400', '１８００')] }
+  it('先頭に「＝」の付いた数字・数字だけの式は「＝」を外して残す（式はそろえた形）。全角の数字はそのまま', () => {
+    const job = { ...shelfJob(), parts: [part('a', 'A', '＝400', '１８００'), part('b', 'B', '＝1800 − 40', ' = (900-18)/2')] }
     const r = numberizeJob(job, [])
-    expect(r.job.parts[0].expr).toEqual({ W: '400', H: '1800' })
-    expect(r.report.replaced).toBe(true)
+    expect(r.job.parts[0].expr).toEqual({ W: '400', H: '１８００' })
+    expect(r.job.parts[1].expr).toEqual({ W: '1800-40', H: '(900-18)/2' })
+    expect(r.report).toEqual({ replaced: true, cleared: [] })
+  })
+
+  it('「＝」だけ・「＝」の後ろが部材の寸法の式は、今までどおり計算して置き換える', () => {
+    const job = { ...shelfJob(), parts: [part('a', 'A', '400', '＝'), part('b', 'B', '＝A.W - 21', '700')] }
+    const r = numberizeJob(job, [])
+    expect(sizes(r.job)).toEqual([
+      ['A', '400', ''],
+      ['B', '379', '700'],
+    ])
+    expect(r.report.cleared.map((c) => [c.partName, c.axis])).toEqual([['A', 'H']])
   })
 
   it('名前・枚数・回転・仕上がりのチェック・id・固定した1枚はそのまま', () => {
@@ -160,11 +195,30 @@ describe('履歴の中の部材も置き換える（仕様書 26.4）', () => {
 
   it('履歴だけに式があっても replaced になる。今の部材は同じ配列のまま', () => {
     const base = shelfJob()
-    const job: Job = { ...base, history: [entry('h', '', [{ name: 'A', expr: { W: '100 * 2', H: '300' }, quantity: 1, rotatable: false, finishedDone: false }])] }
+    const job: Job = {
+      ...base,
+      history: [
+        entry('h', '', [
+          { name: 'A', expr: { W: '100 * 2', H: '300' }, quantity: 1, rotatable: false, finishedDone: false },
+          { name: 'B', expr: { W: 'A.W', H: '300' }, quantity: 1, rotatable: false, finishedDone: false },
+        ]),
+      ],
+    }
     const r = numberizeJob(job, [])
     expect(r.report.replaced).toBe(true)
     expect(r.job.parts).toBe(base.parts)
-    expect(r.job.history[0].parts[0].expr).toEqual({ W: '200', H: '300' })
+    expect(r.job.history[0].parts.map((p) => p.expr)).toEqual([
+      { W: '100 * 2', H: '300' },
+      { W: '200', H: '300' },
+    ])
+  })
+
+  it('履歴の中の数字だけの式もそのまま（置き換えない）', () => {
+    const base = shelfJob()
+    const job: Job = { ...base, history: [entry('h', '', [{ name: 'A', expr: { W: '450-50', H: '1800/2' }, quantity: 1, rotatable: false, finishedDone: false }])] }
+    const r = numberizeJob(job, [])
+    expect(r.job).toBe(job)
+    expect(r.report.replaced).toBe(false)
   })
 })
 
@@ -183,13 +237,14 @@ describe('numberizeJobs（全部の仕事）', () => {
 })
 
 describe('clipHasFormula（アプリの中でコピーしたセルに式が入っているか）', () => {
-  it('部材の寸法・調整寸法・計算の記号が入ったセルがあれば true', () => {
+  it('部材の寸法・調整寸法・「＝」の入ったセルがあれば true', () => {
     expect(clipHasFormula({ rows: 1, cols: 1, cells: [['天板.W - 20']] })).toBe(true)
     expect(clipHasFormula({ rows: 1, cols: 2, cells: [['棚板', `{n:${MELAMINE_ID}}`]] })).toBe(true)
-    expect(clipHasFormula({ rows: 1, cols: 1, cells: [['1800 - 40']] })).toBe(true)
+    expect(clipHasFormula({ rows: 1, cols: 1, cells: [['＝1800 - 40']] })).toBe(true)
   })
-  it('名前・数字・空だけなら false', () => {
+  it('名前・数字・空・数字だけの式（第2.3版。仕様書 27.4）だけなら false', () => {
     expect(clipHasFormula({ rows: 2, cols: 4, cells: [['棚板', '379', '1760', '3'], ['', '400.5', '', '']] })).toBe(false)
+    expect(clipHasFormula({ rows: 1, cols: 2, cells: [['1800 - 40', '(900-18)/2']] })).toBe(false)
   })
 })
 

@@ -129,19 +129,31 @@ describe('pasteCells：1つのセルをコピーしたとき', () => {
     expect(computeDimensions(r.job).parts[0].finished).toEqual({ W: 379, H: 200 })
   })
 
-  it('W・H は数字だけ貼る（第2.2版。仕様書 26.1）：0 より大きい数（全角・小数も）は数字にそろえて貼る。式・名前の文字・0 は貼らない', () => {
+  it('W・H に貼れるのは数字か数字だけの式（第2.3版。仕様書 27.4）：数は数字にそろえ、式は式のまま貼る。部材の寸法・名前の文字・0 以下・計算できない式は貼らない', () => {
     const job = jobOf(part('a', 'A'), part('b', 'B'))
     expect(okPaste(pasteCells(job, clipOf([['４００.５０']]), [c(0, 'W')], ids())).job.parts[0].expr.W).toBe('400.5')
     expect(okPaste(pasteCells(job, clipOf([['']]), [c(0, 'H')], ids())).job.parts[0].expr.H).toBe('')
-    for (const bad of ['天板.W - 20', '1800 - 40', '棚板', '0', '-5', `{n:${MELAMINE_ID}}`]) {
+    expect(okPaste(pasteCells(job, clipOf([['1800 - 40']]), [c(0, 'H')], ids())).job.parts[0].expr.H).toBe('1800-40')
+    expect(okPaste(pasteCells(job, clipOf([['（900－18）÷2']]), [c(0, 'W')], ids())).job.parts[0].expr.W).toBe('(900-18)/2')
+    const message = '幅・長さには、0 より大きい数か、数字の式だけ貼れます'
+    for (const bad of ['天板.W - 20', '棚板', '0', '-5', '50-100', '450-', '1/0', '=450-50', `{n:${MELAMINE_ID}}`]) {
       const r = okPaste(pasteCells(job, clipOf([[bad]]), [c(0, 'W'), c(1, 'H')], ids()))
       expect(r.pasted).toBe(0)
       expect(r.skipped).toEqual([
-        { cell: c(0, 'W'), reason: 'notSize', message: 'W・H には 0 より大きい数だけ貼れます' },
-        { cell: c(1, 'H'), reason: 'notSize', message: 'W・H には 0 より大きい数だけ貼れます' },
+        { cell: c(0, 'W'), reason: 'notSize', message },
+        { cell: c(1, 'H'), reason: 'notSize', message },
       ])
       expect(r.job).toBe(job)
     }
+  })
+
+  it('式のセルをコピーして貼ると、式のまま写る（値に直さない。仕様書 27.4）。計算した値は式の値', () => {
+    const job = jobOf(part('a', 'A', '450-50', '(1800-36)/2'), part('b', 'B'))
+    const clip = okCopy(copyCells(job, [c(0, 'W'), c(0, 'H')]))
+    expect(clip.cells).toEqual([['450-50', '(1800-36)/2']])
+    const r = okPaste(pasteCells(job, clip, [c(1, 'W')], ids()))
+    expect(r.job.parts[1].expr).toEqual({ W: '450-50', H: '(1800-36)/2' })
+    expect(computeDimensions(r.job).parts[1].finished).toEqual({ W: 400, H: 882 })
   })
 
   it('第2.2版（仕様書 26.3）：「棚板」をコピーして2つのセルに貼ると、どちらも「棚板」（番号を振らない）', () => {

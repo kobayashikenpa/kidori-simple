@@ -76,8 +76,9 @@ export interface Part {
    */
   name: string
   /**
-   * 仕上がり寸法の入力（W・H）。第2.2版（仕様書 26.1）から **数字だけ**：空か、半角の数字（小数可。キーで入れている途中の「12.」も）。
-   * 保存の形は前の版と同じ文字のまま（前の版の式は読み込むときに数字に置き換える。engine/migrate/numbers.ts）。読み方は engine/size.ts
+   * 仕上がり寸法の入力（W・H）。第2.2版（仕様書 26.1）から数字だけ、第2.3版（仕様書 27.1）から **空・数字・数字と ＋ − × ÷ ( ) だけの式**
+   * （例 450-50。保存はそろえた半角の + - * /。キーで入れている途中の「12.」「450-」も）。部材の寸法・調整寸法の参照は無い。
+   * 保存の形は前の版と同じ文字のまま（前の版の部材の寸法・調整寸法を使った式は読み込むときに数字に置き換える。engine/migrate/numbers.ts）。読み方は engine/size.ts
    */
   expr: Record<Axis, string>
   /** 枚数（0 は切り出さない寸法だけの行。null は枚数が空＝寸法は計算するが、木取り・必要な枚数・進み具合・比べに入れない） */
@@ -195,7 +196,8 @@ export interface CellCut {
 // ---------- 寸法の計算結果 ----------
 
 /**
- * 寸法のエラーの種類。第2.2版の computeDimensions が出すのは syntax（空・数字でない）と nonPositive（0 以下）だけ。
+ * 寸法のエラーの種類。computeDimensions が出すのは syntax（空・数字でない・計算できない式）と nonPositive（0 以下）と
+ * divideByZero（式で 0 で割った。第2.3版）だけ。
  * ほかは前の版の式の計算（engine/migrate/legacyDimensions）だけが出す
  */
 export type DimensionErrorKind =
@@ -204,7 +206,7 @@ export type DimensionErrorKind =
   | 'unknownAdjust' // 前の版：式が使っている調整寸法が削除されている
   | 'cycle' // 前の版：循環参照
   | 'nonPositive' // 0 以下
-  | 'divideByZero' // 前の版：0 で割った
+  | 'divideByZero' // 0 で割った（第2.3版の数字だけの式・前の版の式）
 
 export interface DimensionError {
   partId: string

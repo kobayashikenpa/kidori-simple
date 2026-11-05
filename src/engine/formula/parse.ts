@@ -40,6 +40,9 @@ class SyntaxFailure {
 
 const OP_LABELS: Readonly<Record<Operator, string>> = { '+': '+', '-': '−', '*': '×', '/': '÷' }
 
+/** 式の終わりが記号か「(」のときの、後ろに入れるものの言い方（数字だけの式 size.ts は「後ろに数字を…」に言い換える） */
+export const END_HINT = '後ろに数値か部材の寸法を入れてください'
+
 /** 空の式のエラーの文 */
 export const EMPTY_FORMULA_MESSAGE = '数値か式を入れてください'
 
@@ -122,7 +125,7 @@ export function parse(expr: string, adjusts?: readonly Adjust[]): ParseResult {
   function parseFactor(): Expr {
     const tok = peek()
     // 式の終わりが記号か「(」：入れている途中
-    if (!tok) return fail(`式が「${label(tokens[tokens.length - 1])}」で終わっています（後ろに数値か部材の寸法を入れてください）`, tok, true)
+    if (!tok) return fail(`式が「${label(tokens[tokens.length - 1])}」で終わっています（${END_HINT}）`, tok, true)
     switch (tok.type) {
       case '-':
         pos++

@@ -3,9 +3,11 @@
 //   そのときの仕上がり寸法（前の版の計算 legacyComputeDimensions と同じ値。小数第1位に丸める）の数字にする
 // - 調整寸法は、そのデータの中の調整寸法の一覧で計算する（保存データなら AppData.adjusts、ファイルならファイルの adjusts）
 // - 式がエラーで値が出ないもの（無い部材・削除した調整寸法・循環・0 以下 など）は空にして、知らせる一覧に入れる
-// 数字だけの W・H（キーで入れている途中の「12.」・空も）は式ではないので、そのまま残す（size.ts の isSizeInput）
+// 数字だけの W・H（キーで入れている途中の「12.」・空も）は式ではないので、そのまま残す（size.ts の isSizeInput）。
+// 第2.3版（仕様書 27.4）から、数字と ＋ − × ÷ ( ) だけの式（1800-40 など。途中の形・エラーの式も）もそのまま残す。
+// 先頭に「＝」の付いた数字・数字だけの式は「＝」を外して残す（暫定。第2.3版の W・H には「＝」を使えないため）
 import { partLabelAt } from '../parts'
-import { isSizeInput, sizeText } from '../size'
+import { isSizeInput, normalizeSizeText, sizeText } from '../size'
 import { AXES, type Adjust, type Axis, type CellClip, type HistoryEntry, type Job, type Part, type Settings } from '../types'
 import { legacyComputeDimensions } from './legacyDimensions'
 
@@ -42,8 +44,19 @@ function usableOf(rows: readonly LegacyAdjust[]): Adjust[] {
   return rows.filter((r): r is Adjust => r.name.trim() !== '' && r.value !== null && Number.isFinite(r.value) && r.value > 0)
 }
 
-/** W・H の文字が式か（数字だけの形でない） */
+/** W・H の文字が置き換える式か（数字・数字だけの式の形でない。部材の寸法・調整寸法・「＝」などを使っている） */
 const isFormula = (text: string): boolean => !isSizeInput(text)
+
+/**
+ * 先頭に「＝」（全角・半角）の付いた、数字・数字だけの式なら、「＝」を外してそろえた形（例：「＝1800 − 40」→「1800-40」）。
+ * それ以外（「＝」が無い・「＝」だけ・後ろに部材の寸法などがある）は null
+ */
+function withoutEquals(text: string): string | null {
+  const m = /^\s*=(.*)$/su.exec(text.normalize('NFKC'))
+  if (!m) return null
+  const rest = m[1]
+  return rest.trim() !== '' && isSizeInput(rest) ? normalizeSizeText(rest) : null
+}
 
 type SizePart = Pick<Part, 'name' | 'expr'>
 
@@ -66,6 +79,11 @@ function numberizeParts<P extends SizePart>(
     const expr = { ...p.expr }
     for (const a of AXES) {
       if (!isFormula(p.expr[a])) continue
+      const kept = withoutEquals(p.expr[a])
+      if (kept !== null) {
+        expr[a] = kept
+        continue
+      }
       const v = dims.parts[i].finishedByAxis[a]
       if (v === undefined) {
         expr[a] = ''
@@ -124,16 +142,19 @@ export function mergeNumbering(a: NumberingReport, b: NumberingReport): Numberin
   return { replaced: true, cleared: [...a.cleared, ...b.cleared] }
 }
 
-/** セルの文字が式か（部材の寸法・調整寸法・計算の記号・「＝」が入っている）。名前・数字・空は式ではない */
+/**
+ * セルの文字が置き換える式か（部材の寸法・調整寸法・「＝」などが入っている）。名前・数字・空・数字だけの式（第2.3版）は式ではない
+ */
 function looksLikeFormula(text: string): boolean {
   const t = text.normalize('NFKC').trim()
-  if (t === '' || /^\d*\.?\d*$/.test(t)) return false
+  if (t === '' || isSizeInput(t)) return false
   return /[+\-*/().{}=\s×✕÷−–—]/u.test(t)
 }
 
 /**
- * アプリの中でコピーしておいたセル（AppData.cellClip）に式が入っているか（仕様書 26.4：入っていればそのコピーは捨てる）。
- * コピーには列の位置が無いので、セルの文字で見分ける（名前には式の記号を使えなかったので、記号の入ったセルは式）
+ * アプリの中でコピーしておいたセル（AppData.cellClip）に、置き換える式が入っているか（仕様書 26.4：入っていればそのコピーは捨てる）。
+ * 数字だけの式（1800 - 40 など）は第2.3版でそのまま使えるので捨てない（仕様書 27.4）。
+ * コピーには列の位置が無いので、セルの文字で見分ける（前の版の名前には式の記号を使えなかったので、記号の入ったセルは式）
  */
 export function clipHasFormula(clip: CellClip): boolean {
   return clip.cells.some((row) => row.some(looksLikeFormula))
