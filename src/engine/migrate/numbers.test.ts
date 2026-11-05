@@ -60,7 +60,7 @@ describe('numberizeJob（仕事の W・H の式を仕上がり寸法の数字に
   it('値は小数第1位に丸める（A.W ＝ 1000 / 3 → 333.3）。数字だけの式の A はそのまま', () => {
     const job = { ...shelfJob(), parts: [part('a', 'A', '1000 / 3', '0.1 + 0.2'), part('b', 'B', 'A.W', 'A.H')] }
     const out = numberizeJob(job, []).job
-    expect(out.parts[0].expr).toEqual({ W: '1000 / 3', H: '0.1 + 0.2' })
+    expect(out.parts[0].expr).toEqual({ W: '1000/3', H: '0.1+0.2' })
     expect(out.parts[1].expr).toEqual({ W: '333.3', H: '0.3' })
   })
 
@@ -76,12 +76,12 @@ describe('numberizeJob（仕事の W・H の式を仕上がり寸法の数字に
       ],
     }
     const { job: out, report } = numberizeJob(job, shelfAdjusts())
-    // 数字だけの式（1 / 0・1800 - 2000・300 +）はエラーでもそのまま残す（第2.3版。開いたあとに画面で直せる）
+    // 数字だけの式（1 / 0・1800 - 2000・300 +）はエラーでもそのまま残す（第2.3版。開いたあとに画面で直せる）。書き方は保存の形にそろえる
     expect(sizes(out)).toEqual([
       ['天板', '600', ''],
       ['', '', '0'],
-      ['扉', '1 / 0', '1800 - 2000'],
-      ['棚', '300 +', ''],
+      ['扉', '1/0', '1800-2000'],
+      ['棚', '300+', ''],
       ['戸', '', ''],
     ])
     expect(report.replaced).toBe(true)
@@ -100,8 +100,16 @@ describe('numberizeJob（仕事の W・H の式を仕上がり寸法の数字に
       parts: [part('a', 'A', '1800-40', '(900-18)/2'), part('b', 'B', '1800 − 40', '450×2'), part('c', 'C', '450-', '1/0'), part('d', 'D', '（９００）', '-5')],
     }
     const r = numberizeJob(job, [])
-    expect(r.job).toBe(job)
+    // 書き方だけ保存の形（半角・空白なし）にそろえる。置き換えには数えない
+    expect(sizes(r.job)).toEqual([
+      ['A', '1800-40', '(900-18)/2'],
+      ['B', '1800-40', '450*2'],
+      ['C', '450-', '1/0'],
+      ['D', '(900)', '-5'],
+    ])
     expect(r.report).toEqual({ replaced: false, cleared: [] })
+    const tidy = { ...shelfJob(), parts: [part('a', 'A', '1800-40', '(900-18)/2')] }
+    expect(numberizeJob(tidy, []).job).toBe(tidy)
   })
 
   it('部材の寸法を使った式は、数字だけの式の値で計算して数字にする（数字だけの式はそのまま）', () => {
@@ -208,7 +216,7 @@ describe('履歴の中の部材も置き換える（仕様書 26.4）', () => {
     expect(r.report.replaced).toBe(true)
     expect(r.job.parts).toBe(base.parts)
     expect(r.job.history[0].parts.map((p) => p.expr)).toEqual([
-      { W: '100 * 2', H: '300' },
+      { W: '100*2', H: '300' },
       { W: '200', H: '300' },
     ])
   })
