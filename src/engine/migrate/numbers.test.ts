@@ -255,7 +255,7 @@ describe('numberingMessage（1度だけ出す知らせの文）', () => {
   it('エラーで空にしたものが無ければ「式を数字に置き換えました」', () => {
     expect(numberingMessage({ replaced: true, cleared: [] })).toBe('式を数字に置き換えました')
   })
-  it('あれば件数と「仕事名・部材名 W」を並べる。履歴の中のものは（履歴）を付ける', () => {
+  it('あれば件数と「仕事名・部材名 幅」を並べる（W は幅、H は長さ。仕様書 27.5）。履歴の中のものは（履歴）を付ける', () => {
     const report: NumberingReport = {
       replaced: true,
       cleared: [
@@ -263,6 +263,6 @@ describe('numberingMessage（1度だけ出す知らせの文）', () => {
         { jobId: 'j1', jobName: '本棚', partName: '#2', axis: 'H', history: { id: 'h', savedAt: 't', memo: '' } },
       ],
     }
-    expect(numberingMessage(report)).toBe('式を数字に置き換えました（エラーで空にしたもの 2件：本棚・棚板 W、本棚・#2 H（履歴））')
+    expect(numberingMessage(report)).toBe('式を数字に置き換えました（エラーで空にしたもの 2件：本棚・棚板 幅、本棚・#2 長さ（履歴））')
   })
 })

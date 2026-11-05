@@ -1,11 +1,15 @@
-// 部材の表の［木取り］のタブ（仕様書 15.1・5.1）：仕上がりのタブと同じ表の形で、番号・名前・木取り寸法 W・H・枚数（切った数）を見るだけ。
+// 部材の表の［木取り］のタブ（仕様書 15.1・5.1）：仕上がりのタブと同じ表の形で、番号・名前・木取り寸法 幅・長さ（W・H。仕様書 27.5）・枚数（切った数）を見るだけ。
 // 押しても編集しない（入力は［仕上がり］のタブ）。枚数 0 は「切らない」、枚数が空の行は薄く出す。
 // 木取り寸法は engine（computeDimensions の cutByAxis）、切った数は engine（partCutProgress）の結果を並べるだけ
 import { hasName } from '../../engine/parts'
 import type { PartCutProgress } from '../../engine/progress/partProgress'
 import type { Axis, DimensionResult, Job } from '../../engine/types'
 import { fmt } from '../format'
+import { CELL_COL_LABEL } from '../cellSelect'
 import { cutDimCell, cutQuantityText } from '../partsTable'
+
+/** 画面での寸法の呼び方（W は「幅」、H は「長さ」。仕様書 27.5） */
+const AXIS_LABEL: Record<Axis, string> = { W: CELL_COL_LABEL.W, H: CELL_COL_LABEL.H }
 
 interface Props {
   job: Job
@@ -21,8 +25,8 @@ export function CutTable({ job, dims, progress }: Props) {
       <div className="pt-row pt-head" role="row">
         <span role="columnheader">番号</span>
         <span role="columnheader">名前</span>
-        <span role="columnheader">W</span>
-        <span role="columnheader">H</span>
+        <span role="columnheader">{AXIS_LABEL.W}</span>
+        <span role="columnheader">{AXIS_LABEL.H}</span>
         <span role="columnheader">枚数</span>
       </div>
       {parts.map((part, i) => {
@@ -36,7 +40,7 @@ export function CutTable({ job, dims, progress }: Props) {
           const c = cutDimCell(part, d, axis)
           const text = c.kind === 'empty' ? '空' : c.kind === 'error' ? 'エラー' : fmt(c.value)
           return (
-            <span role="cell" className={`pt-cell pt-dim${c.kind === 'error' ? ' bad' : ''}`} aria-label={`${axis} ${text}`}>
+            <span role="cell" className={`pt-cell pt-dim${c.kind === 'error' ? ' bad' : ''}`} aria-label={`${label} の ${AXIS_LABEL[axis]}：${text}`}>
               {c.kind === 'error' ? 'エラー' : c.kind === 'empty' ? null : <span className="num">{fmt(c.value)}</span>}
             </span>
           )

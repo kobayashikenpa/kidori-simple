@@ -160,9 +160,12 @@ export function clipHasFormula(clip: CellClip): boolean {
   return clip.cells.some((row) => row.some(looksLikeFormula))
 }
 
-/** 知らせる一覧の1つ：「本棚・棚板 W」（履歴の中なら「（履歴）」を付ける） */
+/** 画面での寸法の呼び方（第2.3版 仕様書 27.5：W は「幅」、H は「長さ」） */
+const AXIS_LABEL: Record<Axis, string> = { W: '幅', H: '長さ' }
+
+/** 知らせる一覧の1つ：「本棚・棚板 幅」（履歴の中なら「（履歴）」を付ける） */
 function clearedLabel(c: ClearedSize): string {
-  return `${c.jobName}・${c.partName} ${c.axis}${c.history ? '（履歴）' : ''}`
+  return `${c.jobName}・${c.partName} ${AXIS_LABEL[c.axis]}${c.history ? '（履歴）' : ''}`
 }
 
 /**
