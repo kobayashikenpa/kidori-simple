@@ -12,6 +12,7 @@ import { defaultJobName, newId } from '../../store/jobs'
 import { useJobStore } from '../../store/useJobStore'
 import { Help } from '../components/Help'
 import { ImportDialog } from '../components/ImportDialog'
+import { InstallHint } from '../components/InstallHint'
 import { jobMeta, sortJobsNewestFirst } from '../jobList'
 import { jsonFile, shareFile } from '../platform/shareSheet'
 import { MAKE_FAILED, shareResultText } from '../transferView'
@@ -293,6 +294,8 @@ export function JobsScreen({ onOpened }: { onOpened: () => void }) {
           <p className="job-hint">長押しでメニュー</p>
         </>
       )}
+
+      <InstallHint />
 
       <div className="job-tools">
         <button type="button" className="btn small" onClick={addSample}>

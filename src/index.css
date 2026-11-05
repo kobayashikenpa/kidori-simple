@@ -393,6 +393,28 @@ h3 {
   font-size: 12px;
   margin: 4px 2px 0;
 }
+.install-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.install-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.install-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
 .job-tools {
   display: flex;
   flex-wrap: wrap;
