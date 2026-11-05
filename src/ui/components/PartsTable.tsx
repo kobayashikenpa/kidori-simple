@@ -84,10 +84,9 @@ function cellOf(s: Sel | null, parts: readonly Part[]): TableCell | null {
 const FIELD_LABEL: Record<TableField, string> = CELL_COL_LABEL
 
 /** 幅・長さが板のどちらの辺か（仕様書 18.4・27.5。回転しない部材は 幅 を妻手・長さ を長手に合わせて置く） */
-const AXIS_SIDE: Record<Axis, string> = { W: '妻手', H: '長手' }
 
-/** 見出し・並べ替えのメニューの名前：「幅（妻手）」「長さ（長手）」「名前」「枚数」 */
-const fieldTitle = (f: TableField): string => (f === 'W' || f === 'H' ? `${FIELD_LABEL[f]}（${AXIS_SIDE[f]}）` : FIELD_LABEL[f])
+/** 見出し・並べ替えのメニューの名前：「幅」「長さ」「名前」「枚数」（仕様書 27.5。妻手・長手は添えない） */
+const fieldTitle = (f: TableField): string => FIELD_LABEL[f]
 
 /** 欄の列の位置（0＝名前 … 3＝枚数） */
 const colOf = (f: TableField): number => CELL_COLS.indexOf(f)
@@ -600,15 +599,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
                 onPress={() => pressColumn(c)}
                 onLong={() => openSort(c)}
               >
-                {f === 'W' || f === 'H' ? (
-                  // 幅は板の妻手・長さは板の長手（仕様書 18.4・27.5）。375px に収まるよう下の段は小さく
-                  <span className="pt-h2">
-                    <span>{FIELD_LABEL[f]}</span>
-                    <span className="pt-h2-sub">{AXIS_SIDE[f]}</span>
-                  </span>
-                ) : (
-                  FIELD_LABEL[f]
-                )}
+                {FIELD_LABEL[f]}
               </HeadButton>
             </span>
           ))}
@@ -885,7 +876,7 @@ interface SizeKeysProps {
 }
 
 /**
- * 幅・長さのキー（仕様書 26.1・27.1・27.2）：上の1行に部材と 幅（妻手）・入れている数字か式とカーソル（式は × ÷ − の書き方。
+ * 幅・長さのキー（仕様書 26.1・27.1・27.2）：上の1行に部材と 幅・入れている数字か式とカーソル（式は × ÷ − の書き方。
  * 入れている途中でないエラーは赤で理由）、その下に数字と ＋ − × ÷ ( ) のキー
  */
 function SizeKeys({ label, axis, value, cursor, errors, onKey, onNext, onClose }: SizeKeysProps) {
@@ -898,7 +889,7 @@ function SizeKeys({ label, axis, value, cursor, errors, onKey, onNext, onClose }
         <span className="pt-show-name">
           <span className="pt-show-label">{label}</span>
           <b>
-            {FIELD_LABEL[axis]}（{AXIS_SIDE[axis]}）
+            {FIELD_LABEL[axis]}
           </b>
         </span>
         <span className="pt-show-expr num" aria-label={`入れている数字か式：${shown || '空'}`}>

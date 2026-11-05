@@ -1613,17 +1613,6 @@ h3 > .help {
   color: var(--accent);
   font-weight: 700;
 }
-/* W・H の見出しは2段（W／妻手、H／長手。仕様書 18.4）。下の段は小さく */
-.pt-h2 {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.15;
-}
-.pt-h2-sub {
-  font-size: 10px;
-  font-weight: 400;
-}
 .pt-cell.rs {
   position: relative;
   opacity: 1 !important;
