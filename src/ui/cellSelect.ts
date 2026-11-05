@@ -1,6 +1,7 @@
 // セルを選ぶ（第1.3版。仕様書 17.1）の画面の手伝い：選んでいる範囲（四角）の持ち方と、コピー・貼り付けの知らせの文。
 // 計算（コピー・貼り付け・消す・行を削除）は engine/clipboard/cells.ts と store の reducer が行う
 import type { PasteSkip } from '../engine/clipboard/cells'
+import { isSizeFormula, sizeLabel } from '../engine/size'
 import type { CellClip, CellCol, CellPos, CellRange } from '../engine/types'
 
 /** セルの鍵（"行:列"） */
@@ -65,7 +66,10 @@ export function clipText(clip: (Pick<CellClip, 'rows' | 'cols' | 'cells'> & { cu
   if (!clip) return null
   const head = clip.cut ? '切り取り中' : 'コピー中'
   if (clip.rows === 1 && clip.cols === 1) {
-    const t = clip.cells[0]?.[0] ?? ''
+    // 数字だけの式（450-50）は × ÷ − の書き方で出す（第2.4版 仕様書 28.3）。どの列から写したかは持っていないので、
+    // 式の形の名前（「1-2」など）も同じ書き方になる（見た目だけ。写した中身は変わらない）
+    const raw = clip.cells[0]?.[0] ?? ''
+    const t = isSizeFormula(raw) ? sizeLabel(raw) : raw
     const shown = t === '' ? '空' : [...t].length > CLIP_TEXT_MAX ? `${[...t].slice(0, CLIP_TEXT_MAX).join('')}…` : t
     return `${head}：1つ（${shown}）`
   }

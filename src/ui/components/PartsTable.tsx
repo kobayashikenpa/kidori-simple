@@ -9,7 +9,10 @@
 // 選ぶ・取っ手・長押しの指の動きは useGrid。
 // 第2.2版（仕様書 26）：W・H は数字だけ。式・調整寸法の表・「＝」でセルを押して寸法を入れる動き・式の隣の計算した寸法はなくした
 // 第2.3版（仕様書 27）：W・H に数字と ＋ − × ÷ ( ) だけの式を入れられる（キーは PadKeys、編集は sizeEdit.ts、計算は engine）。
-// 式の入ったセルの右上に ƒ。表のすぐ上の1行の欄（CellBar）に、選んだセルの中身だけ（式なら 450−50）を出す。
+// 式の入ったセルの右上に ƒ。
+// 第2.4版（仕様書 28）：選んだセルの中身だけ（式なら 450−50）を出す欄（式の欄。ƒx の印は付けない）を、画面の下（下のタブのすぐ上）に1つだけ置く。
+// 幅・長さ・枚数のセルを選んでいる間だけ出し、欄を押すか選んでいるセルをもう一度押すと、その欄で入力（カーソル・アプリのキーは欄のすぐ下・✓ で終える）。
+// 第2.3版の「表の上の欄」と「キーの上の行」はこの欄にまとめた（2重に出さない）
 // 画面では W を「幅」、H を「長さ」と出す（保存データの中は W・H のまま）
 // 第2.0版（仕様書 24）：見出しを長押しすると並べ替えのメニュー（大きい順・小さい順／あいうえお順・逆の順。並べ替えは engine の sortParts）。
 // 選んでいる行の番号を上下に引くと、その行を動かす（engine の moveParts。指の動きは useGrid）
@@ -29,6 +32,7 @@ import { pressKey } from '../numpad'
 import {
   addRowsMin,
   cellBarText,
+  fxBarField,
   inputRow,
   isBlankPart,
   nextCell,
@@ -160,8 +164,8 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
     selSRef.current = selS
   })
   const tableRef = useRef<HTMLDivElement>(null)
-  const padRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLButtonElement>(null)
+  // 画面の下の 式の欄とアプリのキーをまとめた入れ物（入力していないときは欄だけ）
+  const dockRef = useRef<HTMLDivElement>(null)
   const nameInputs = useRef(new Map<number, HTMLInputElement>())
   const rowEls = useRef(new Map<number, HTMLDivElement>())
   const headEls = useRef<(HTMLButtonElement | null)[]>([])
@@ -320,7 +324,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   // 欄を選んでいる間：表とキーの外を押したら閉じる（ほかの表のセルは押したことが決まってから。useOutsideEnd）
   useOutsideEnd(
     anySel,
-    (t) => !!tableRef.current?.contains(t) || !!padRef.current?.contains(t) || !!barRef.current?.contains(t),
+    (t) => !!tableRef.current?.contains(t) || !!dockRef.current?.contains(t),
     () => selectRef.current(null),
   )
   useEffect(() => {
@@ -328,9 +332,15 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
     return claimOpen('pad', () => selectRef.current(null))
   }, [padOpen])
 
-  // キーの高さ（表の下に同じだけ余白を足す）と、入力している行が見えるようにスクロールする
-  const padH = usePadHeight(padRef, padOpen ? sel.field : null)
-  useRevealRow(rowEls, padRef, selKey, padH)
+  // 式の欄（第2.4版 仕様書 28.1）：選んでいる範囲の左上が 幅・長さ・枚数 のセルの間だけ出す（入力中はそのセル）
+  const barRange = range ? clampRange(range, rowCount) : null
+  const barField = sel ? (sel.field === 'name' ? null : sel.field) : fxBarField(barRange)
+  const barOn = barField !== null
+  // 欄（入力中はキーも）の高さ（表の下に同じだけ余白を足す）と、選んだ・入力している行が欄の上に見えるようにスクロールする。
+  // 入力していないときは、1つのセルを選んだときだけ合わせる（列全体などを選んだときは動かさない）
+  const dockH = usePadHeight(dockRef, barOn ? `${barField}:${padOpen ? 'pad' : 'bar'}` : null)
+  const revealKey = selKey || (barOn && barRange && barRange.rows === 1 && barRange.cols === 1 ? `${barRange.top}:${barField}:bar` : '')
+  useRevealRow(rowEls, dockRef, revealKey, dockH)
 
   const onNameKey = (row: number, e: ReactKeyboardEvent<HTMLInputElement>) => {
     // 日本語の変換を確定する Enter は除く
@@ -413,7 +423,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   }
 
   /**
-   * 表の上の欄を押したとき（仕様書 27.3）：選んでいるセルの入力を始める（もう一度押すのと同じ）。
+   * 式の欄を押したとき（仕様書 27.3・28.2）：選んでいるセルの入力を始める（もう一度押すのと同じ）。
    * 範囲・行・列を選んでいるときは、欄に出している左上のセル。入力中・何も選んでいないときは何もしない
    */
   const pressBar = () => {
@@ -533,9 +543,16 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   const clipNow = clipText(clip)
   const { handleAt, fillBox, cutBox } = useGridBoxes(tableRef, rowEls, headEls, shown, rangeKey(fillExt), cutKey)
 
-  // 表の上の欄（仕様書 27.3）：選んだセル（範囲は左上）の 幅・長さ の中身だけ。入力中は入力中の式とカーソル
+  // 式の欄の中身（仕様書 28.1）：選んだセル（範囲は左上）の中身だけ。入力中は入力中の式（枚数）とカーソル
   const barText = cellBarText(parts, shown)
-  const barCursor = padAxis ? Math.max(0, Math.min(barText.length, cursor)) : null
+  const barCursor = padAxis ? Math.max(0, Math.min(barText.length, cursor)) : padOpen ? barText.length : null
+  // 欄のすぐ上に出すエラーの理由（仕様書 28.2）：入力中は入れている途中の形を除く。選んでいるだけのときは全部
+  const barPart = shown ? parts[shown.top] : undefined
+  const barErrors =
+    barPart && (barField === 'W' || barField === 'H')
+      ? [...new Set((padOpen ? errorsWhileEditing(axisErrors(barPart.id, barField)) : axisErrors(barPart.id, barField)).map((x) => x.message))]
+      : []
+  const barWho = barPart && hasName(barPart) ? barPart.name : shown ? `${shown.top + 1}行目` : ''
 
   const rows = Array.from({ length: rowCount }, (_, i) => i)
   const showHandles = shown !== null && shownEnd !== null && !anySel
@@ -559,24 +576,6 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
           {clipNow && <p className="pt-clip">{clipNow}</p>}
         </div>
       )}
-      <button
-        type="button"
-        ref={barRef}
-        className={`pt-bar${padAxis ? ' editing' : ''}`}
-        aria-label={`選んだセルの中身：${barText || '空'}${padAxis ? '（入力中）' : anySel ? '' : '（押すと入力）'}`}
-        onPointerDown={keepFocus}
-        onClick={pressBar}
-      >
-        {barCursor === null ? (
-          <span className="pt-bar-text num">{barText}</span>
-        ) : (
-          <>
-            <span className="pt-bar-text num">{barText.slice(0, barCursor)}</span>
-            <span className="caret" aria-hidden="true" />
-            <span className="pt-bar-text num">{barText.slice(barCursor)}</span>
-          </>
-        )}
-      </button>
       <div
         className={`pt pt-edit${dragging ? ' dragging' : ''}${moving ? ' moving' : ''}`}
         ref={tableRef}
@@ -768,8 +767,8 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
       <button type="button" className="btn add-rows" onClick={addRows}>
         ＋ 5行足す
       </button>
-      {/* キーを出している間も、表を指でなぞって下までスクロールできるよう、キーの高さの余白を下に取る */}
-      {padOpen && <div className="pt-spacer" style={{ height: padH }} aria-hidden="true" />}
+      {/* 式の欄（入力中はキーも）を出している間も、表の最後の行・「＋ 5行足す」が隠れないよう、その高さの余白を下に取る */}
+      {barOn && <div className="pt-spacer" style={{ height: dockH }} aria-hidden="true" />}
       {menuOpen && shown && (
         <CellMenu
           job={job}
@@ -800,34 +799,68 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
           </div>
         </Sheet>
       )}
-      {padOpen &&
-        sel &&
+      {barOn &&
+        barField &&
         createPortal(
-          <div className="numpad pt-pad" ref={padRef} role="group" aria-label={`${selLabel} の ${FIELD_LABEL[sel.field]} のキー`}>
-            <div className="numpad-in">
-              {sel.field === 'qty' ? (
-                <QtyKeys
-                  key={`${sel.row}-qty`}
-                  label={selLabel}
-                  quantity={selPart?.quantity ?? null}
-                  onKey={(k) => pressQty(sel.row, k)}
-                  onNext={goNext}
-                  onClose={() => selectCell(null)}
-                />
-              ) : (
-                padAxis && (
-                  <SizeKeys
-                    key={`${sel.row}-${padAxis}`}
-                    label={selLabel}
-                    axis={padAxis}
-                    value={selPart?.expr[padAxis] ?? ''}
-                    cursor={cursor}
-                    errors={selPart ? [...new Set(errorsWhileEditing(axisErrors(selPart.id, padAxis)).map((x) => x.message))] : []}
-                    onKey={(k) => pressSize(sel.row, padAxis, k)}
-                    onNext={goNext}
-                    onClose={() => selectCell(null)}
-                  />
-                )
+          <div className={`fxdock${padOpen ? ' editing' : ''}`} ref={dockRef}>
+            <div className="fxdock-in">
+              {barErrors.length > 0 && (
+                <p className="fx-err" role="alert">
+                  {barErrors.join('。')}
+                </p>
+              )}
+              <div className="fx-row">
+                <button
+                  type="button"
+                  className={`fx-bar${padOpen ? ' editing' : ''}`}
+                  aria-label={`${barWho} の ${FIELD_LABEL[barField]}：${barText || '空'}${padOpen ? '（入力中）' : '（押すと入力）'}`}
+                  onPointerDown={keepFocus}
+                  onClick={pressBar}
+                >
+                  <span className="fx-text num">
+                    {barCursor === null ? (
+                      <span className="fx-chars">{barText}</span>
+                    ) : (
+                      <>
+                        <span className="fx-chars">{barText.slice(0, barCursor)}</span>
+                        <span className="caret" aria-hidden="true" />
+                        <span className="fx-chars">{barText.slice(barCursor)}</span>
+                      </>
+                    )}
+                    {padOpen && barText === '' && <span className="fx-hint">{padAxis ? '数字か式を入れる' : '枚数を入れる'}</span>}
+                  </span>
+                  {padOpen && barField === 'qty' && (
+                    <span className="fx-note">
+                      {selPart?.quantity === null || selPart?.quantity === undefined
+                        ? '空＝木取りに入れない'
+                        : selPart.quantity === 0
+                          ? '寸法だけ（切らない）'
+                          : `${selPart.quantity}枚`}
+                    </span>
+                  )}
+                </button>
+                {padOpen && (
+                  <button type="button" className="fx-done" aria-label="入力を終える" onPointerDown={keepFocus} onClick={() => selectCell(null)}>
+                    ✓
+                  </button>
+                )}
+              </div>
+              {padOpen && sel && (
+                <div className="pt-pad" role="group" aria-label={`${selLabel} の ${FIELD_LABEL[sel.field]} のキー`}>
+                  {sel.field === 'qty' ? (
+                    <PadKeys size={false} onKey={(k) => pressQty(sel.row, k)} ariaLabel="枚数のキー" onNext={goNext} onClose={() => selectCell(null)} />
+                  ) : (
+                    padAxis && (
+                      <PadKeys
+                        size
+                        onKey={(k) => pressSize(sel.row, padAxis, k)}
+                        ariaLabel={`${FIELD_LABEL[padAxis]} のキー`}
+                        onNext={goNext}
+                        onClose={() => selectCell(null)}
+                      />
+                    )
+                  )}
+                </div>
               )}
             </div>
           </div>,
@@ -858,79 +891,5 @@ function HeadButton({ buttonRef, className, label, onPress, onLong, children }: 
     <button type="button" ref={buttonRef} className={className} aria-label={label} {...longPress(onPress, onLong)}>
       {children}
     </button>
-  )
-}
-
-interface SizeKeysProps {
-  label: string
-  axis: Axis
-  /** 入れている数字の文字（空も） */
-  value: string
-  /** カーソル（文字の位置） */
-  cursor: number
-  /** キーの上に出すエラー（入れている途中のものは除いたもの） */
-  errors: string[]
-  onKey: (key: SizeKey) => void
-  onNext: () => void
-  onClose: () => void
-}
-
-/**
- * 幅・長さのキー（仕様書 26.1・27.1・27.2）：上の1行に部材と 幅・入れている数字か式とカーソル（式は × ÷ − の書き方。
- * 入れている途中でないエラーは赤で理由）、その下に数字と ＋ − × ÷ ( ) のキー
- */
-function SizeKeys({ label, axis, value, cursor, errors, onKey, onNext, onClose }: SizeKeysProps) {
-  const at = Math.max(0, Math.min(value.length, cursor))
-  // 文字の位置は sizeLabel で変わらない（1字を1字に置き換える）ので、カーソルの位置はそのまま使える
-  const shown = sizeLabel(value)
-  return (
-    <>
-      <div className="pt-show" aria-live="polite">
-        <span className="pt-show-name">
-          <span className="pt-show-label">{label}</span>
-          <b>
-            {FIELD_LABEL[axis]}
-          </b>
-        </span>
-        <span className="pt-show-expr num" aria-label={`入れている数字か式：${shown || '空'}`}>
-          <span className="pt-show-text">{shown.slice(0, at)}</span>
-          <span className="caret" aria-hidden="true" />
-          <span className="pt-show-text">{shown.slice(at)}</span>
-          {value === '' && <span className="pt-show-hint">数字か式を入れる</span>}
-        </span>
-        {errors.length > 0 && <span className="pt-show-err">{errors.join('。')}</span>}
-      </div>
-      <PadKeys size onKey={onKey} ariaLabel={`${FIELD_LABEL[axis]} のキー`} onNext={onNext} onClose={onClose} />
-    </>
-  )
-}
-
-interface QtyKeysProps {
-  label: string
-  quantity: number | null
-  onKey: (key: string) => void
-  onNext: () => void
-  onClose: () => void
-}
-
-/**
- * 枚数のキー（仕様書 16.2・27.2）：幅・長さのキーと同じ並び・同じ高さ。数字・1字消す・全部消す・閉じる・次へ は同じ位置で、
- * 使わないキー（◀▶・小数点・＋ − × ÷ ( )）は薄く出して押せない
- */
-function QtyKeys({ label, quantity, onKey, onNext, onClose }: QtyKeysProps) {
-  return (
-    <>
-      <div className="pt-show" aria-live="polite">
-        <span className="pt-show-name">
-          <span className="pt-show-label">{label}</span>
-          <b>枚数</b>
-        </span>
-        <span className="pt-show-expr num">{quantity ?? ''}</span>
-        <span className="pt-show-val small">
-          {quantity === null ? '空（木取りに入れません）' : quantity === 0 ? '寸法だけ（切らない）' : `${quantity}枚`}
-        </span>
-      </div>
-      <PadKeys size={false} onKey={onKey} ariaLabel="枚数のキー" onNext={onNext} onClose={onClose} />
-    </>
   )
 }

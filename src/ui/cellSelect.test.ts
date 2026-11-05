@@ -71,6 +71,12 @@ describe('今コピーしているもの', () => {
     expect(clipText({ rows: 1, cols: 1, cells: [['天板.W - メラミン1 * 2']] })).toBe('コピー中：1つ（天板.W - メラミ…）')
     expect(clipText({ rows: 2, cols: 2, cells: [['1', '2'], ['3', '4']] })).toBe('コピー中：2行×2列')
   })
+  it('数字だけの式は × ÷ − の書き方で出す（第2.4版 仕様書 28.3）', () => {
+    expect(clipText({ rows: 1, cols: 1, cells: [['450-50']] })).toBe('コピー中：1つ（450−50）')
+    expect(clipText({ rows: 1, cols: 1, cells: [['(9-1)/2*3']] })).toBe('コピー中：1つ（(9−1)÷2×3）')
+    // 数字だけの式でない（名前など）はそのまま
+    expect(clipText({ rows: 1, cols: 1, cells: [['A-1 棚']] })).toBe('コピー中：1つ（A-1 棚）')
+  })
   it('切り取りは「切り取り中」', () => {
     const cut = { jobId: 'j', range: { top: 0, left: 1, rows: 1, cols: 1 } }
     expect(clipText({ rows: 1, cols: 1, cells: [['400']], cut })).toBe('切り取り中：1つ（400）')

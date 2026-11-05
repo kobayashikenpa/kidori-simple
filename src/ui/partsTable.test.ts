@@ -19,6 +19,7 @@ import {
   setSessionTableMinRows,
   errorsWhileEditing,
   cellBarText,
+  fxBarField,
 } from './partsTable'
 
 describe('部材の表の行（仕様書 15.1）', () => {
@@ -167,11 +168,12 @@ describe('入力中の式のエラー（第2.3版。仕様書 27.1）', () => {
   })
 })
 
-describe('表の上の欄（第2.3版。仕様書 27.3）', () => {
+describe('式の欄（第2.4版。仕様書 28.1）', () => {
   const parts = () => {
     const job = shelfJob()
     job.parts[3].expr.W = '400-21'
     job.parts[3].expr.H = '(1800-40)/1'
+    job.parts[2].quantity = null
     return job.parts
   }
   const cell = (top: number, left: number, rows = 1, cols = 1) => ({ top, left, rows, cols })
@@ -180,16 +182,29 @@ describe('表の上の欄（第2.3版。仕様書 27.3）', () => {
     expect(cellBarText(parts(), cell(3, 2))).toBe('(1800−40)÷1')
     expect(cellBarText(parts(), cell(0, 1))).toBe('400')
   })
-  it('何も選んでいない・名前・枚数のセル・空の行は空', () => {
+  it('枚数のセルは枚数（空は空、0 は 0）', () => {
+    expect(cellBarText(parts(), cell(3, 3))).toBe('3')
+    expect(cellBarText(parts(), cell(0, 3))).toBe('0')
+    expect(cellBarText(parts(), cell(2, 3))).toBe('')
+  })
+  it('何も選んでいない・名前のセル・空の行は空', () => {
     expect(cellBarText(parts(), null)).toBe('')
     expect(cellBarText(parts(), cell(3, 0))).toBe('')
-    expect(cellBarText(parts(), cell(3, 3))).toBe('')
     expect(cellBarText(parts(), cell(4, 1))).toBe('')
+    expect(cellBarText(parts(), cell(4, 3))).toBe('')
   })
   it('範囲・行・列を選んだら左上のセル', () => {
     expect(cellBarText(parts(), cell(3, 1, 1, 2))).toBe('400−21')
     expect(cellBarText(parts(), cell(2, 2, 2, 2))).toBe('700')
     // 行全体は左上が名前なので空
     expect(cellBarText(parts(), cell(3, 0, 1, 4))).toBe('')
+  })
+  it('欄を出すのは、左上が幅・長さ・枚数のセルのときだけ（空の行も出す。名前・何も選んでいないときは出さない）', () => {
+    expect(fxBarField(cell(3, 1))).toBe('W')
+    expect(fxBarField(cell(4, 2))).toBe('H')
+    expect(fxBarField(cell(0, 3, 3, 1))).toBe('qty')
+    expect(fxBarField(cell(3, 0))).toBeNull()
+    expect(fxBarField(cell(3, 0, 1, 4))).toBeNull()
+    expect(fxBarField(null)).toBeNull()
   })
 })

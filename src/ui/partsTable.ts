@@ -121,14 +121,24 @@ export function errorsWhileEditing(errors: readonly DimensionError[]): Dimension
 }
 
 /**
- * 部材の表のすぐ上の1行の欄に出す文字（第2.3版。仕様書 27.3）：選んでいる範囲の左上のセルが 幅・長さ なら、
- * そのセルの中身だけ（式は × ÷ − の書き方。例 450−50、数字は 400）。部材名・列の名前は出さない。
- * 何も選んでいない・左上が名前・枚数のセル・空の行は ''
+ * 式の欄（画面の下の欄）（第2.4版。仕様書 28.1）を出す列：選んでいる範囲の左上のセルが 幅・長さ・枚数 なら その列、
+ * 名前のセル・何も選んでいないときは null（欄を出さない）。空の行のセルでも出す（そこに入れられるので）
+ */
+export function fxBarField(range: CellRange | null): Exclude<TableField, 'name'> | null {
+  if (!range) return null
+  const col = CELL_COLS[range.left]
+  return col === 'W' || col === 'H' || col === 'qty' ? col : null
+}
+
+/**
+ * 式の欄（画面の下の欄）に出す文字（第2.3版 仕様書 27.3・第2.4版 28.1）：選んでいる範囲の左上のセルの中身だけ。
+ * 幅・長さは式なら × ÷ − の書き方（例 450−50）、数字は 400。枚数は枚数（空は ''）。部材名・列の名前は出さない。
+ * 何も選んでいない・左上が名前のセル・空の行は ''
  */
 export function cellBarText(parts: readonly Part[], range: CellRange | null): string {
-  if (!range) return ''
-  const col = CELL_COLS[range.left]
-  if (col !== 'W' && col !== 'H') return ''
-  const part = parts[range.top]
-  return part ? sizeLabel(part.expr[col]) : ''
+  const col = fxBarField(range)
+  const part = range && col ? parts[range.top] : undefined
+  if (!part || !col) return ''
+  if (col === 'qty') return quantityText(part.quantity)
+  return sizeLabel(part.expr[col])
 }
