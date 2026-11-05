@@ -1,6 +1,7 @@
 // 部材の表（仕様書 15.1）の行と欄の決まり。画面から切り離して試せるようにする（寸法の計算はしない）
 import { isBlankPart } from '../engine/parts'
-import type { Axis, DimensionError, Part, PartDimensions } from '../engine/types'
+import { sizeLabel } from '../engine/size'
+import { CELL_COLS, type Axis, type CellRange, type DimensionError, type Part, type PartDimensions } from '../engine/types'
 import { dimCell, type DimCell } from './partCells'
 
 /** 表の欄（番号の欄は選ばない） */
@@ -117,4 +118,17 @@ export function rotationState(parts: readonly Pick<Part, 'rotatable'>[]): Rotati
  */
 export function errorsWhileEditing(errors: readonly DimensionError[]): DimensionError[] {
   return errors.filter((e) => !e.incomplete)
+}
+
+/**
+ * 部材の表のすぐ上の1行の欄に出す文字（第2.3版。仕様書 27.3）：選んでいる範囲の左上のセルが 幅・長さ なら、
+ * そのセルの中身だけ（式は × ÷ − の書き方。例 450−50、数字は 400）。部材名・列の名前は出さない。
+ * 何も選んでいない・左上が名前・枚数のセル・空の行は ''
+ */
+export function cellBarText(parts: readonly Part[], range: CellRange | null): string {
+  if (!range) return ''
+  const col = CELL_COLS[range.left]
+  if (col !== 'W' && col !== 'H') return ''
+  const part = parts[range.top]
+  return part ? sizeLabel(part.expr[col]) : ''
 }

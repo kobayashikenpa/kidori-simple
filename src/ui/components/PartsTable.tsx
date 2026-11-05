@@ -8,22 +8,27 @@
 // 寸法の計算は engine（computeDimensions の結果を受け取る）。W・H の数字の編集は sizeEdit.ts、枚数は numpad.ts
 // 選ぶ・取っ手・長押しの指の動きは useGrid。
 // 第2.2版（仕様書 26）：W・H は数字だけ。式・調整寸法の表・「＝」でセルを押して寸法を入れる動き・式の隣の計算した寸法はなくした
+// 第2.3版（仕様書 27）：W・H に数字と ＋ − × ÷ ( ) だけの式を入れられる（キーは PadKeys、編集は sizeEdit.ts、計算は engine）。
+// 式の入ったセルの右上に ƒ。表のすぐ上の1行の欄（CellBar）に、選んだセルの中身だけ（式なら 450−50）を出す。
+// 画面では W を「幅」、H を「長さ」と出す（保存データの中は W・H のまま）
 // 第2.0版（仕様書 24）：見出しを長押しすると並べ替えのメニュー（大きい順・小さい順／あいうえお順・逆の順。並べ替えは engine の sortParts）。
 // 選んでいる行の番号を上下に引くと、その行を動かす（engine の moveParts。指の動きは useGrid）
-import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { columnRange, rowRange } from '../../engine/clipboard/cells'
 import { movedTop, type SortKey, type SortOrder } from '../../engine/order'
 import { hasName } from '../../engine/parts'
+import { isSizeFormula, sizeLabel } from '../../engine/size'
 import { CELL_COLS, type Axis, type CellClip, type CellRange, type DimensionResult, type Job, type Part } from '../../engine/types'
 import { currentJob, type ReduceResult, type StoreAction } from '../../store/reducer'
-import { clampRange, clipText, fillExtension, fillHint, fillText, isSingleAt, rangeEnd, rangeHas, rangeText, singleRange } from '../cellSelect'
+import { CELL_COL_LABEL, clampRange, clipText, fillExtension, fillHint, fillText, isSingleAt, rangeEnd, rangeHas, rangeText, singleRange } from '../cellSelect'
 import { claimOpen } from '../exclusive'
 import { fmt } from '../format'
 import { closeKeyboard } from '../keyboard'
 import { pressKey } from '../numpad'
 import {
   addRowsMin,
+  cellBarText,
   inputRow,
   isBlankPart,
   nextCell,
@@ -75,10 +80,14 @@ function cellOf(s: Sel | null, parts: readonly Part[]): TableCell | null {
   return row < 0 ? null : { row, field: s.field }
 }
 
-const FIELD_LABEL: Record<TableField, string> = { name: '名前', W: 'W', H: 'H', qty: '枚数' }
+/** 欄の画面の名前（第2.3版 仕様書 27.5：W は「幅」、H は「長さ」） */
+const FIELD_LABEL: Record<TableField, string> = CELL_COL_LABEL
 
-/** W・H が板のどちらの辺か（仕様書 18.4。回転しない部材は W を妻手・H を長手に合わせて置く） */
+/** 幅・長さが板のどちらの辺か（仕様書 18.4・27.5。回転しない部材は 幅 を妻手・長さ を長手に合わせて置く） */
 const AXIS_SIDE: Record<Axis, string> = { W: '妻手', H: '長手' }
+
+/** 見出し・並べ替えのメニューの名前：「幅（妻手）」「長さ（長手）」「名前」「枚数」 */
+const fieldTitle = (f: TableField): string => (f === 'W' || f === 'H' ? `${FIELD_LABEL[f]}（${AXIS_SIDE[f]}）` : FIELD_LABEL[f])
 
 /** 欄の列の位置（0＝名前 … 3＝枚数） */
 const colOf = (f: TableField): number => CELL_COLS.indexOf(f)
@@ -86,7 +95,7 @@ const colOf = (f: TableField): number => CELL_COLS.indexOf(f)
 /** 見出しの列 → 並べ替えに使う列（engine の SortKey） */
 const SORT_KEY: Record<TableField, SortKey> = { name: 'name', W: 'W', H: 'H', qty: 'qty' }
 
-/** 並べ替えのメニューのボタン（仕様書 24.1）：W・H・枚数は大きい順・小さい順、名前はあいうえお順・逆の順 */
+/** 並べ替えのメニューのボタン（仕様書 24.1）：幅・長さ・枚数は大きい順・小さい順、名前はあいうえお順・逆の順 */
 function sortChoices(f: TableField): { order: SortOrder; label: string }[] {
   return f === 'name'
     ? [
@@ -153,6 +162,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   })
   const tableRef = useRef<HTMLDivElement>(null)
   const padRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLButtonElement>(null)
   const nameInputs = useRef(new Map<number, HTMLInputElement>())
   const rowEls = useRef(new Map<number, HTMLDivElement>())
   const headEls = useRef<(HTMLButtonElement | null)[]>([])
@@ -311,7 +321,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   // 欄を選んでいる間：表とキーの外を押したら閉じる（ほかの表のセルは押したことが決まってから。useOutsideEnd）
   useOutsideEnd(
     anySel,
-    (t) => !!tableRef.current?.contains(t) || !!padRef.current?.contains(t),
+    (t) => !!tableRef.current?.contains(t) || !!padRef.current?.contains(t) || !!barRef.current?.contains(t),
     () => selectRef.current(null),
   )
   useEffect(() => {
@@ -345,7 +355,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
 
   // ---------- W・H・枚数 ----------
 
-  /** W・H のキーを押したとき：数字を変えて保存する（空の行なら部材を作る） */
+  /** 幅・長さのキーを押したとき：数字か式を変えて保存する（空の行なら部材を作る） */
   const pressSize = (row: number, axis: Axis, key: SizeKey) => {
     const part = jobRef.current.parts[row]
     const e = pressSizeKey(part?.expr[axis] ?? '', cursorRef.current, key)
@@ -401,6 +411,19 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
     setNotice(null)
     if (isSingleAt(rangeRef.current, p)) startInput({ row, field })
     else selectRange(singleRange(p))
+  }
+
+  /**
+   * 表の上の欄を押したとき（仕様書 27.3）：選んでいるセルの入力を始める（もう一度押すのと同じ）。
+   * 範囲・行・列を選んでいるときは、欄に出している左上のセル。入力中・何も選んでいないときは何もしない
+   */
+  const pressBar = () => {
+    if (curCell()) return
+    const r = rangeRef.current ? clampRange(rangeRef.current, rowCount) : null
+    if (!r) return
+    onError(null)
+    setNotice(null)
+    startInput({ row: r.top, field: CELL_COLS[r.left] })
   }
 
   /** 番号を押すと行全体、見出しを押すと列全体（入力中なら入力を終える） */
@@ -511,10 +534,14 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   const clipNow = clipText(clip)
   const { handleAt, fillBox, cutBox } = useGridBoxes(tableRef, rowEls, headEls, shown, rangeKey(fillExt), cutKey)
 
+  // 表の上の欄（仕様書 27.3）：選んだセル（範囲は左上）の 幅・長さ の中身だけ。入力中は入力中の式とカーソル
+  const barText = cellBarText(parts, shown)
+  const barCursor = padAxis ? Math.max(0, Math.min(barText.length, cursor)) : null
+
   const rows = Array.from({ length: rowCount }, (_, i) => i)
   const showHandles = shown !== null && shownEnd !== null && !anySel
 
-  // 長押しのメニューの見出し：1つのセルは「天板 の W」、範囲は「3行×2列（2〜4行目）」
+  // 長押しのメニューの見出し：1つのセルは「天板 の 幅」、範囲は「3行×2列（2〜4行目）」
   const menuTitle = (() => {
     if (!shown) return ''
     if (shown.rows === 1 && shown.cols === 1) {
@@ -533,6 +560,24 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
           {clipNow && <p className="pt-clip">{clipNow}</p>}
         </div>
       )}
+      <button
+        type="button"
+        ref={barRef}
+        className={`pt-bar${padAxis ? ' editing' : ''}`}
+        aria-label={`選んだセルの中身：${barText || '空'}${padAxis ? '（入力中）' : anySel ? '' : '（押すと入力）'}`}
+        onPointerDown={keepFocus}
+        onClick={pressBar}
+      >
+        {barCursor === null ? (
+          <span className="pt-bar-text num">{barText}</span>
+        ) : (
+          <>
+            <span className="pt-bar-text num">{barText.slice(0, barCursor)}</span>
+            <span className="caret" aria-hidden="true" />
+            <span className="pt-bar-text num">{barText.slice(barCursor)}</span>
+          </>
+        )}
+      </button>
       <div
         className={`pt pt-edit${dragging ? ' dragging' : ''}${moving ? ' moving' : ''}`}
         ref={tableRef}
@@ -551,14 +596,14 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
                   headEls.current[c] = el
                 }}
                 className={`pt-hcell${c === 0 ? ' left' : ''}${shown && c >= shown.left && c < shown.left + shown.cols ? ' hl' : ''}`}
-                label={`${f === 'W' || f === 'H' ? `${f}（${AXIS_SIDE[f]}）` : FIELD_LABEL[f]} の列を選ぶ（長押しで並べ替え）`}
+                label={`${fieldTitle(f)} の列を選ぶ（長押しで並べ替え）`}
                 onPress={() => pressColumn(c)}
                 onLong={() => openSort(c)}
               >
                 {f === 'W' || f === 'H' ? (
-                  // W は板の妻手・H は板の長手（仕様書 18.4）。375px に収まるよう下の段は小さく
+                  // 幅は板の妻手・長さは板の長手（仕様書 18.4・27.5）。375px に収まるよう下の段は小さく
                   <span className="pt-h2">
-                    <span>{f}</span>
+                    <span>{FIELD_LABEL[f]}</span>
                     <span className="pt-h2-sub">{AXIS_SIDE[f]}</span>
                   </span>
                 ) : (
@@ -663,17 +708,24 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
             // 入力を終えたら今までどおり「エラー」
             const c = raw.kind === 'error' && padOpen && isSel(axis) ? ({ kind: 'empty' } as const) : raw
             const text = c.kind === 'empty' ? '' : c.kind === 'error' ? 'エラー' : fmt(c.value)
+            // 式の入ったセルは右上に小さな ƒ（仕様書 27.1。数字だけのセルと見分ける）
+            const formula = !!part && isSizeFormula(part.expr[axis])
             return (
               <button
                 type="button"
                 className={`pt-cell pt-dim${c.kind === 'error' ? ' bad' : ''}${isSel(axis) ? ' on' : ''}${rangeCls(axis)}`}
                 data-row={i}
                 data-col={colOf(axis)}
-                aria-label={`${label} の ${axis}：${text || '空'}`}
+                aria-label={`${label} の ${FIELD_LABEL[axis]}：${text || '空'}${formula ? `（式 ${sizeLabel(part.expr[axis])}）` : ''}`}
                 aria-selected={inRange(axis)}
                 onClick={cellPress(axis)}
               >
                 {c.kind === 'error' ? 'エラー' : c.kind === 'empty' ? null : <span className="num">{fmt(c.value)}</span>}
+                {formula && (
+                  <span className="pt-fx" aria-hidden="true">
+                    ƒ
+                  </span>
+                )}
               </button>
             )
           }
@@ -743,7 +795,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
       )}
       {sortCol !== null && (
         <Sheet
-          title={`${CELL_COLS[sortCol] === 'W' || CELL_COLS[sortCol] === 'H' ? `${CELL_COLS[sortCol]}（${AXIS_SIDE[CELL_COLS[sortCol] as Axis]}）` : FIELD_LABEL[CELL_COLS[sortCol]]}で並べ替え`}
+          title={`${fieldTitle(CELL_COLS[sortCol])}で並べ替え`}
           onClose={() => setSortCol(null)}
         >
           <div className="cm-group">
@@ -794,6 +846,9 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
   )
 }
 
+/** ボタンを押しても注目が移らないようにする（入力中の名前の欄からスマホのキーボードが外れないように） */
+const keepFocus = (e: ReactPointerEvent) => e.preventDefault()
+
 interface HeadButtonProps {
   buttonRef: (el: HTMLButtonElement | null) => void
   className: string
@@ -829,27 +884,32 @@ interface SizeKeysProps {
   onClose: () => void
 }
 
-/** W・H のキー（仕様書 26.1）：上の1行に部材と W（妻手）・入れている数字とカーソル（0 以下なら赤で理由）、その下に数字のキー */
+/**
+ * 幅・長さのキー（仕様書 26.1・27.1・27.2）：上の1行に部材と 幅（妻手）・入れている数字か式とカーソル（式は × ÷ − の書き方。
+ * 入れている途中でないエラーは赤で理由）、その下に数字と ＋ − × ÷ ( ) のキー
+ */
 function SizeKeys({ label, axis, value, cursor, errors, onKey, onNext, onClose }: SizeKeysProps) {
   const at = Math.max(0, Math.min(value.length, cursor))
+  // 文字の位置は sizeLabel で変わらない（1字を1字に置き換える）ので、カーソルの位置はそのまま使える
+  const shown = sizeLabel(value)
   return (
     <>
       <div className="pt-show" aria-live="polite">
         <span className="pt-show-name">
           <span className="pt-show-label">{label}</span>
           <b>
-            {axis}（{AXIS_SIDE[axis]}）
+            {FIELD_LABEL[axis]}（{AXIS_SIDE[axis]}）
           </b>
         </span>
-        <span className="pt-show-expr num" aria-label={`入れている数字：${value || '空'}`}>
-          <span className="pt-show-text">{value.slice(0, at)}</span>
+        <span className="pt-show-expr num" aria-label={`入れている数字か式：${shown || '空'}`}>
+          <span className="pt-show-text">{shown.slice(0, at)}</span>
           <span className="caret" aria-hidden="true" />
-          <span className="pt-show-text">{value.slice(at)}</span>
-          {value === '' && <span className="pt-show-hint">数字を入れる</span>}
+          <span className="pt-show-text">{shown.slice(at)}</span>
+          {value === '' && <span className="pt-show-hint">数字か式を入れる</span>}
         </span>
         {errors.length > 0 && <span className="pt-show-err">{errors.join('。')}</span>}
       </div>
-      <PadKeys size onKey={onKey} ariaLabel={`${axis} のキー`} onNext={onNext} onClose={onClose} />
+      <PadKeys size onKey={onKey} ariaLabel={`${FIELD_LABEL[axis]} のキー`} onNext={onNext} onClose={onClose} />
     </>
   )
 }
@@ -863,8 +923,8 @@ interface QtyKeysProps {
 }
 
 /**
- * 枚数のキー（仕様書 16.2）：W・H のキーと同じ並び・同じ高さ。数字・1字消す・全部消す・閉じる・次へ は同じ位置で、
- * 使わないキー（◀▶・小数点）は薄く出して押せない
+ * 枚数のキー（仕様書 16.2・27.2）：幅・長さのキーと同じ並び・同じ高さ。数字・1字消す・全部消す・閉じる・次へ は同じ位置で、
+ * 使わないキー（◀▶・小数点・＋ − × ÷ ( )）は薄く出して押せない
  */
 function QtyKeys({ label, quantity, onKey, onNext, onClose }: QtyKeysProps) {
   return (
