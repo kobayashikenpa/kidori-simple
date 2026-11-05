@@ -56,17 +56,20 @@ export function inputRow(row: number, partCount: number): number {
   return Math.max(0, Math.min(row, partCount))
 }
 
-/** 「次へ」の行き先：名前 → W → H → 枚数 → 次の行の名前 */
+/**
+ * 「次へ」の行き先（仕様書 29.1）：名前は縦に進む（次の行の名前）。
+ * 幅・長さ・枚数は横に進み（W → H → 枚数）、枚数の次は次の行の幅（名前の列には進まない）
+ */
 export function nextCell(cell: TableCell, partCount: number): TableCell {
   switch (cell.field) {
     case 'name':
-      return { row: cell.row, field: 'W' }
+      return { row: inputRow(cell.row + 1, partCount), field: 'name' }
     case 'W':
       return { row: cell.row, field: 'H' }
     case 'H':
       return { row: cell.row, field: 'qty' }
     case 'qty':
-      return { row: inputRow(cell.row + 1, partCount), field: 'name' }
+      return { row: inputRow(cell.row + 1, partCount), field: 'W' }
   }
 }
 

@@ -347,9 +347,15 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return
     e.preventDefault()
     if (!commitName(row, nameDraftRef.current)) return
-    // キーボードの「次へ（改行）」：同じ行の W へ（アプリのキーを出す）
-    selectCell({ row, field: 'W' })
-    e.currentTarget.blur()
+    // キーボードの「次へ（改行）」：次の行の名前へ（縦に進む。スマホのキーボードのまま。仕様書 29.1）
+    const next = nextCell({ row, field: 'name' }, jobRef.current.parts.length)
+    if (next.row === row) {
+      // 空の行で名前が空のときは進めない（入力を終える）
+      selectCell(null)
+      e.currentTarget.blur()
+      return
+    }
+    startInput(next)
   }
 
   const onNameBlur = (row: number) => {
@@ -386,7 +392,7 @@ export function PartsTable({ job, dims, clip, dispatch, onError, ref }: Props) {
     if (q !== part.quantity) run({ type: 'updatePart', partId: part.id, patch: { quantity: q } })
   }
 
-  /** 「次へ」：名前 → W → H → 枚数 → 次の行の名前（入力のまま）。名前に移るときはスマホのキーボードを出す */
+  /** 「次へ」：幅 → 長さ → 枚数 → 次の行の幅（入力のまま。名前の列には進まない。仕様書 29.1） */
   const goNext = () => {
     const cur = curCell()
     if (!cur) return
